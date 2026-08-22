@@ -262,7 +262,7 @@ function App() {
               </div>)}
             </div>
             <div className="mt-10 grid gap-8 rounded-2xl bg-[#f0dfc6] p-7 md:grid-cols-[1fr_auto] md:items-center md:p-10">
-              <div><p className="eyebrow text-[#ad5a41]">A useful promise</p><blockquote className="mt-4 max-w-[730px] font-display text-2xl font-bold leading-tight tracking-[-.05em] text-[#032e60] md:text-3xl">“You never have to pretend you understood the form. Ask us, and we’ll go through it with you.”</blockquote><p className="mt-5 text-xs font-bold text-[#6e6e62]">— Maya & Dev, the people behind Airnet</p></div>
+              <div><p className="eyebrow text-[#ad5a41]">A useful promise</p><blockquote className="mt-4 max-w-[730px] font-display text-2xl font-bold leading-tight tracking-[-.05em] text-[#032e60] md:text-3xl">“You never have to pretend you understood the form. Ask us, and we’ll go through it with you.”</blockquote><p className="mt-5 text-xs font-bold text-[#6e6e62]">— Md Amjad Ali, Airnet Computers</p></div>
               <div className="relative h-24 w-24 rotate-3 rounded-full border-2 border-[#d96f4a] p-2"><div className="grid h-full w-full place-items-center rounded-full border border-[#d96f4a] text-center text-[9px] font-bold uppercase leading-3 tracking-[.1em] text-[#ad5a41]">local<br />help<br />first</div></div>
             </div>
           </div>
@@ -282,12 +282,12 @@ function App() {
               <p className="eyebrow text-[#a5d8c9]">Find your local online desk</p>
               <h2 className="font-display mt-3 max-w-[560px] text-5xl font-bold leading-[.95] tracking-[-.07em] md:text-6xl">Bring the form.<br /><span className="text-[#f2b544]">Leave with a plan.</span></h2>
               <div className="mt-9 grid gap-5 text-sm text-[#c5d5df] sm:grid-cols-2">
-                <div className="flex gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>18 Market Street<br />Geelong VIC 3220</span></div>
-                <div className="flex gap-3"><Clock3 size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Mon–Fri 9am–5:30pm<br />Sat 9am–1pm</span></div>
-                <div className="flex gap-3"><Phone size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>(03) 5221 4088<br />Call before you come in</span></div>
-                <div className="flex gap-3"><Mail size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>hello@airnet.com.au<br />We reply within a day</span></div>
+                 <div className="flex gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>Opp. Congress Office (Talampally Foundation)<br />Haralayya Chowk, Basavakalyan – 585327<br />Bidar, Karnataka, India</span></div>
+                 <div className="flex gap-3"><Clock3 size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Mon–Fri 9am–5:30pm<br />Sat 9am–1pm</span></div>
+                 <div className="flex gap-3"><Phone size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>Md Amjad Ali<br />+91 7892881086</span></div>
+                 <div className="flex gap-3"><Mail size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Call Md Amjad Ali<br />for help with your application</span></div>
               </div>
-              <div className="mt-9 flex flex-wrap gap-3"><button data-testid="button-get-directions" onClick={() => flash("Directions are ready — we’ll see you soon.")} className="flex items-center gap-2 rounded-full bg-[#f2b544] px-5 py-3 text-sm font-bold text-[#032e60] hover:bg-[#ffc968]"><Navigation size={15} /> Get directions</button><button data-testid="button-call-desk" onClick={() => flash("Calling (03) 5221 4088…")} className="flex items-center gap-2 rounded-full border border-[#63829d] px-5 py-3 text-sm font-bold hover:border-[#f2b544] hover:text-[#f2b544]"><Phone size={15} /> Call the desk</button></div>
+               <div className="mt-9 flex flex-wrap gap-3"><a data-testid="button-get-directions" href="https://www.google.com/maps/place/Airnet+Computers.+Amjad+Ali,+Haralayya+Chowk+oppsite+Kaish+Motor+Hero+Showroom,+near+omer+masjid,+Basavakalyan,+Karnataka+585327/data=!4m2!3m1!1s0x3bcf3be23e8892a9:0x84ce7fa678a0994d!18m1!1e1?utm_source=mstt_1&entry=gps&coh=192189&g_ep=CAESBzI2LjE3LjUYACCenQoqngEsOTQyNjc3MjcsOTQyOTIxOTUsOTQyOTk1MzIsMTAwNzk2NDk4LDEwMDc5Nzc2MSwxMDA3OTY1MzUsOTQyODQ0NTQsOTQyODA1NzYsOTQyMDczOTQsOTQyMDc1MDYsOTQyMDg1MDYsOTQyMTg2NTMsOTQyMjk4MzksOTQyNzUxNjgsOTQyNzk2MTksMTAwNzk5MjQ2LDEwMDc5MjU2OE" target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-full bg-[#f2b544] px-5 py-3 text-sm font-bold text-[#032e60] hover:bg-[#ffc968]"><Navigation size={15} /> Get directions</a><a data-testid="button-call-desk" href="tel:+917892881086" className="flex items-center gap-2 rounded-full border border-[#63829d] px-5 py-3 text-sm font-bold hover:border-[#f2b544] hover:text-[#f2b544]"><Phone size={15} /> Call Md Amjad Ali</a></div>
             </div>
             <div className="relative min-h-[290px] overflow-hidden rounded-2xl border border-[#355779] bg-[#0d3a69] p-6">
               <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "linear-gradient(#6c8ba2 1px, transparent 1px), linear-gradient(90deg, #6c8ba2 1px, transparent 1px)", backgroundSize: "44px 44px" }} />
@@ -360,7 +360,7 @@ function ApplicationModal({ service, onClose, onComplete }: { service: string; o
 
 function ContactModal({ onClose, onComplete }: { onClose: () => void; onComplete: () => void }) {
   return <ModalFrame title="Talk to a human" eyebrow="Airnet help desk" onClose={onClose}>
-    <p className="mt-4 text-sm leading-6 text-[#657276]">Tell us what’s confusing and we’ll point you in the right direction. You can also call <strong className="text-[#032e60]">(03) 5221 4088</strong>.</p>
+    <p className="mt-4 text-sm leading-6 text-[#657276]">Tell us what’s confusing and we’ll point you in the right direction. You can also call <strong className="text-[#032e60]">Md Amjad Ali at +91 7892881086</strong>.</p>
     <form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); onComplete(); }}>
       <label className="block text-xs font-bold text-[#31495b]">Your name<input data-testid="input-contact-name" required placeholder="Full name" className="mt-1.5 h-11 w-full rounded-xl border border-[#d6cbb9] bg-[#fffdf8] px-3 text-sm font-normal outline-none placeholder:text-[#929b99] focus:border-[#177d70]" /></label>
       <label className="block text-xs font-bold text-[#31495b]">Mobile or email<input data-testid="input-contact-details" required placeholder="How should we reach you?" className="mt-1.5 h-11 w-full rounded-xl border border-[#d6cbb9] bg-[#fffdf8] px-3 text-sm font-normal outline-none placeholder:text-[#929b99] focus:border-[#177d70]" /></label>
