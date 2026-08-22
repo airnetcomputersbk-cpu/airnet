@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Airnet Computers"
+description = "A responsive storefront and service hub for Airnet Computers, helping customers discover computers, accessories, repairs, and digital services from one trusted local shop."
+version = "1.0.0"
+id = "artifacts/airnet-computers"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21123
+
+[services.development]
+run = "pnpm --filter @workspace/airnet-computers run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/airnet-computers", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/airnet-computers/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21123"
+BASE_PATH = "/"

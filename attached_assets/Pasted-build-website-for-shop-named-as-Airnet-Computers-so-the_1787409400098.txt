@@ -1,0 +1,1154 @@
+build website for shop named as Airnet Computers , so the new version can preserve its existing purpose while adding a real centralized backend, database, authentication, and live synchronization.
+Complete architecture for your Airnet Computers website
+After checking your uploaded project, it already has a good foundation:
+•	Frontend: React + Vite
+•	Backend: Express 5
+•	Database: PostgreSQL
+•	ORM: Drizzle
+•	Validation: Zod
+•	API architecture: OpenAPI-first
+•	Frontend data handling: TanStack Query
+•	Existing modules include Services, Banking/Passbook Generator, and Customer Records.
+The main improvement needed is to make the system a true centralized, multi-computer, real-time application.
+________________________________________
+1. The most important concept: Central Database
+Your requirement is:
+If a record is added, edited, or deleted from Computer A, the same change must automatically appear on Computer B, C, mobile phones, and all other devices using the live website.
+The correct architecture is:
+                  ┌─────────────────────┐
+                  │     USER DEVICE     │
+                  │ Computer / Mobile   │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │  REACT FRONTEND     │
+                  │  Airnet Computers   │
+                  └──────────┬──────────┘
+                             │ HTTPS / API
+                             ▼
+              ┌────────────────────────────┐
+              │      BACKEND SERVER        │
+              │                            │
+              │ Express / Node.js          │
+              │ Authentication             │
+              │ Authorization              │
+              │ Business Logic             │
+              │ Audit Logging              │
+              │ Real-time Socket Server    │
+              └──────────────┬─────────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ CENTRAL POSTGRESQL  │
+                  │      DATABASE       │
+                  └─────────────────────┘
+                             │
+                  ┌──────────┴──────────┐
+                  │                     │
+                  ▼                     ▼
+          Computer A              Computer B
+             ↓                       ↓
+        Same Live Data          Same Live Data
+Basic rule
+Never store the main business data only inside one computer.
+Do not depend on:
+•	LocalStorage
+•	Browser memory
+•	One Excel file
+•	One computer database
+Instead:
+ALL DEVICES
+      ↓
+CENTRAL BACKEND API
+      ↓
+ONE CENTRAL CLOUD DATABASE
+      ↓
+REAL-TIME UPDATE SYSTEM
+      ↓
+ALL CONNECTED DEVICES UPDATE
+________________________________________
+2. Recommended advanced technology stack
+I recommend continuing with your existing TypeScript project instead of rebuilding everything from zero.
+Frontend
+React
+Vite
+TypeScript
+Tailwind CSS
+shadcn/ui
+TanStack Query
+React Hook Form
+Zod
+Socket.IO Client
+Backend
+Node.js
+Express 5
+TypeScript
+Drizzle ORM
+Zod Validation
+JWT Authentication
+Refresh Tokens
+Socket.IO
+OpenAPI
+Rate Limiting
+Role-Based Access Control
+Database
+PostgreSQL
+Cloud infrastructure
+A production structure can be:
+Frontend
+   ↓
+Vercel / Cloudflare / Similar Frontend Hosting
+
+Backend API
+   ↓
+Railway / Render / VPS / Cloud Server
+
+Database
+   ↓
+Managed PostgreSQL
+
+Files
+   ↓
+Cloud Object Storage
+
+Real-time
+   ↓
+Socket.IO / WebSocket
+________________________________________
+3. Complete website structure
+AIRNET COMPUTERS
+│
+├── Public Website
+│   ├── Home
+│   ├── About
+│   ├── Services
+│   ├── Banking Services
+│   ├── Contact
+│   └── Login
+│
+├── Authentication
+│   ├── Admin Login
+│   ├── Staff Login
+│   ├── Password Reset
+│   ├── Session Management
+│   └── Device Management
+│
+└── ADMIN / STAFF DASHBOARD
+    │
+    ├── Dashboard
+    │   ├── Today's Customers
+    │   ├── Pending Services
+    │   ├── Completed Services
+    │   ├── Revenue
+    │   ├── Pending Payments
+    │   └── Recent Activity
+    │
+    ├── Customer Management
+    │   ├── Add Customer
+    │   ├── Search Customer
+    │   ├── Customer Profile
+    │   ├── Service History
+    │   ├── Payment History
+    │   └── Documents
+    │
+    ├── Service Management
+    │   ├── Add Service
+    │   ├── Edit Service
+    │   ├── Service Categories
+    │   ├── Pricing
+    │   └── Active / Inactive
+    │
+    ├── Work Management
+    │   ├── New
+    │   ├── In Progress
+    │   ├── Document Pending
+    │   ├── Submitted
+    │   ├── Completed
+    │   ├── Rejected
+    │   └── Cancelled
+    │
+    ├── Financial Management
+    │   ├── Income
+    │   ├── Expenses
+    │   ├── Pending Payments
+    │   ├── Daily Report
+    │   ├── Monthly Report
+    │   └── Profit Summary
+    │
+    ├── Banking
+    │   ├── Banking Links
+    │   ├── Passbook Generator
+    │   ├── Transaction Records
+    │   └── Customer Banking Services
+    │
+    ├── Notifications
+    │   ├── WhatsApp
+    │   ├── SMS
+    │   ├── Email
+    │   └── Internal Notifications
+    │
+    ├── Reports
+    │   ├── Daily
+    │   ├── Weekly
+    │   ├── Monthly
+    │   ├── Staff-wise
+    │   ├── Service-wise
+    │   ├── Revenue-wise
+    │   └── Excel / PDF Export
+    │
+    ├── User Management
+    │   ├── Admin
+    │   ├── Manager
+    │   ├── Operator
+    │   └── Viewer
+    │
+    └── Settings
+        ├── Company Profile
+        ├── Logo
+        ├── Contact Details
+        ├── Rate List
+        ├── Notification Settings
+        └── System Settings
+________________________________________
+4. Recommended database structure
+The database should be properly relational.
+users
+│
+├── id
+├── name
+├── username
+├── email
+├── password_hash
+├── role_id
+├── status
+├── created_at
+└── updated_at
+
+
+roles
+│
+├── id
+├── name
+└── permissions
+
+
+customers
+│
+├── id
+├── customer_uid
+├── name
+├── mobile
+├── email
+├── address
+├── created_by
+├── created_at
+└── updated_at
+
+
+service_categories
+│
+├── id
+├── name
+├── icon
+├── description
+└── status
+
+
+services
+│
+├── id
+├── category_id
+├── name
+├── description
+├── default_price
+├── portal_url
+├── icon
+├── status
+├── created_at
+└── updated_at
+
+
+service_requests
+│
+├── id
+├── request_number
+├── customer_id
+├── service_id
+├── assigned_to
+├── status
+├── total_amount
+├── paid_amount
+├── balance_amount
+├── priority
+├── notes
+├── created_at
+└── updated_at
+
+
+payments
+│
+├── id
+├── customer_id
+├── service_request_id
+├── amount
+├── payment_method
+├── transaction_reference
+├── received_by
+└── created_at
+
+
+expenses
+│
+├── id
+├── title
+├── category
+├── amount
+├── expense_date
+├── created_by
+└── created_at
+
+
+documents
+│
+├── id
+├── customer_id
+├── service_request_id
+├── file_name
+├── file_url
+├── file_type
+├── uploaded_by
+└── created_at
+
+
+notifications
+│
+├── id
+├── customer_id
+├── service_request_id
+├── type
+├── message
+├── status
+├── sent_at
+└── created_at
+
+
+audit_logs
+│
+├── id
+├── user_id
+├── action
+├── table_name
+├── record_id
+├── old_data
+├── new_data
+├── device_info
+├── ip_address
+└── created_at
+________________________________________
+5. Basic algorithm for the complete system
+A. Adding a customer
+START
+
+User opens Add Customer form
+
+        ↓
+
+User enters customer information
+
+        ↓
+
+Frontend validates form
+
+        ↓
+
+Send POST request to backend
+
+        ↓
+
+Backend validates again
+
+        ↓
+
+Check duplicate mobile number
+
+        ↓
+
+Generate unique Customer ID
+
+        ↓
+
+Save customer in PostgreSQL
+
+        ↓
+
+Create audit log
+
+        ↓
+
+Emit real-time event
+
+        ↓
+
+All connected computers receive update
+
+        ↓
+
+Refresh customer list automatically
+
+END
+Pseudo algorithm:
+function createCustomer(data, user) {
+
+    validate(data)
+
+    duplicate = findCustomerByMobile(data.mobile)
+
+    if (duplicate) {
+        return error("Customer already exists")
+    }
+
+    customerId = generateUniqueId()
+
+    customer = database.insert({
+        customerId,
+        ...data,
+        createdBy: user.id
+    })
+
+    createAuditLog({
+        user: user.id,
+        action: "CREATE_CUSTOMER",
+        record: customer.id
+    })
+
+    socket.broadcast("customer:created", customer)
+
+    return customer
+}
+________________________________________
+6. The real-time synchronization algorithm
+This is the most important part for your requirement.
+When all computers open the website:
+Computer A ─┐
+Computer B ─┼──→ WebSocket Server
+Computer C ─┤
+Mobile      ─┘
+When Computer A changes a record:
+COMPUTER A
+    │
+    │ Edit Customer
+    ▼
+BACKEND API
+    │
+    ▼
+POSTGRESQL DATABASE
+    │
+    │ Save Successfully
+    ▼
+REAL-TIME EVENT
+    │
+    ├────────→ COMPUTER B UPDATE
+    │
+    ├────────→ COMPUTER C UPDATE
+    │
+    └────────→ MOBILE UPDATE
+Example event names:
+customer:created
+customer:updated
+customer:deleted
+
+service:created
+service:updated
+service:deleted
+
+request:created
+request:statusChanged
+request:completed
+
+payment:created
+notification:sent
+Frontend logic:
+socket.on("customer:updated", () => {
+    queryClient.invalidateQueries({
+        queryKey: ["customers"]
+    })
+})
+This means the frontend automatically fetches the newest data.
+________________________________________
+7. Advanced conflict handling
+Suppose:
+Computer A edits Customer Name
+AND
+Computer B edits Customer Mobile Number
+at almost the same time.
+The backend should handle this carefully.
+Use:
+updated_at
+version_number
+transaction
+optimistic locking
+Example:
+Customer Version = 15
+
+Computer A loads Version 15
+Computer B loads Version 15
+
+Computer A saves
+→ Version becomes 16
+
+Computer B tries to save Version 15
+
+Backend detects mismatch
+
+→ Return conflict
+→ Reload latest data
+→ Ask user to review changes
+Algorithm:
+IF incoming_version == database_version
+    UPDATE record
+    version = version + 1
+ELSE
+    RETURN "DATA_CHANGED_BY_ANOTHER_USER"
+This prevents one computer from silently overwriting another computer's changes.
+________________________________________
+8. User roles and permissions
+I recommend this structure:
+Super Admin
+Full system access
+User management
+Delete records
+System settings
+Financial reports
+Database-level administration
+Admin
+Customer management
+Services
+Reports
+Financial data
+Staff management
+Operator
+Add customers
+Create service requests
+Update assigned work
+Upload documents
+Receive payments
+Viewer
+Read-only access
+Reports only
+The permission check must happen in the backend.
+Never depend only on hiding buttons in the frontend.
+Correct:
+Frontend Permission Check
+          +
+Backend Permission Check
+________________________________________
+9. Advanced features I recommend
+Smart universal search
+Search everything from one box:
+Customer Name
+Mobile Number
+Customer ID
+Service Request Number
+Service Name
+________________________________________
+Customer 360° profile
+When opening a customer:
+Customer Information
+        │
+        ├── All Services
+        ├── Pending Work
+        ├── Completed Work
+        ├── Documents
+        ├── Payments
+        ├── Notifications
+        └── Complete History
+________________________________________
+Complete activity timeline
+Example:
+10:30 AM
+Operator Rasool created PAN Card request
+
+11:15 AM
+Document uploaded
+
+12:00 PM
+Application submitted
+
+02:30 PM
+Customer notified through WhatsApp
+
+04:00 PM
+Payment completed
+________________________________________
+Dashboard analytics
+Today Revenue
+
+This Month Revenue
+
+Pending Amount
+
+Total Customers
+
+Pending Applications
+
+Completed Applications
+
+Most Used Service
+
+Operator Performance
+________________________________________
+Automatic notifications
+Trigger-based system:
+STATUS = Completed
+        ↓
+Create notification job
+        ↓
+Send WhatsApp / SMS / Email
+        ↓
+Save notification history
+        ↓
+Prevent duplicate notification
+Important database field:
+notification_sent = true
+notification_sent_at
+notification_reference
+________________________________________
+Backup system
+Use automatic backups:
+Daily Backup
+     ↓
+Encrypted Backup Storage
+     ↓
+Keep 7 / 30 / 90 day versions
+Also create:
+Manual Backup
+Database Export
+Excel Export
+Restore Point
+________________________________________
+10. API structure
+Your backend should follow a clean REST API.
+/api/v1/auth
+/api/v1/users
+/api/v1/customers
+/api/v1/services
+/api/v1/service-requests
+/api/v1/payments
+/api/v1/documents
+/api/v1/expenses
+/api/v1/reports
+/api/v1/notifications
+/api/v1/settings
+/api/v1/audit-logs
+Examples:
+GET    /api/v1/customers
+GET    /api/v1/customers/:id
+POST   /api/v1/customers
+PATCH  /api/v1/customers/:id
+DELETE /api/v1/customers/:id
+________________________________________
+11. Recommended project folder structure
+Your current monorepo can be expanded like this:
+airnet-computers/
+│
+├── apps/
+│   │
+│   ├── web/
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   ├── pages/
+│   │   │   ├── features/
+│   │   │   ├── hooks/
+│   │   │   ├── lib/
+│   │   │   └── socket/
+│   │   │
+│   │   └── public/
+│   │
+│   └── api/
+│       ├── src/
+│       │   ├── routes/
+│       │   ├── controllers/
+│       │   ├── services/
+│       │   ├── repositories/
+│       │   ├── middleware/
+│       │   ├── socket/
+│       │   ├── jobs/
+│       │   └── utils/
+│
+├── packages/
+│   ├── db/
+│   ├── api-contract/
+│   ├── shared-types/
+│   └── validation/
+│
+├── docs/
+│   ├── architecture.md
+│   ├── database.md
+│   └── api.md
+│
+└── docker/
+________________________________________
+12. Complete master AI prompt
+Build and upgrade the existing Airnet Computers website into a complete, production-ready, cloud-based Internet Café and Digital Service Center Management System.
+The system must be a universal multi-device web application. It must work correctly from multiple computers, laptops, tablets, and mobile devices.
+Core Requirement
+The application must use a centralized cloud backend and PostgreSQL database.
+If any user creates, edits, deletes, or updates data from one computer, the changes must automatically become visible on all other logged-in devices.
+Do not store critical business data only in browser LocalStorage, session memory, or a single computer.
+The architecture must be:
+User Device → React Frontend → Secure Backend API → PostgreSQL Database
+For live synchronization:
+PostgreSQL Update → Backend Event → WebSocket/Socket.IO → All Connected Clients
+Preserve Existing Application
+Analyze the existing Airnet Computers project before modifying it.
+Preserve and improve the existing:
+•	Branding
+•	Airnet Computers identity
+•	Services module
+•	Banking module
+•	Passbook generator
+•	Customer record management
+•	Existing useful API architecture
+•	Existing database structure where appropriate
+Do not unnecessarily rebuild working features from scratch.
+Refactor the project carefully into a scalable production architecture.
+Technology Stack
+Use:
+Frontend:
+•	React
+•	Vite
+•	TypeScript
+•	Tailwind CSS
+•	shadcn/ui
+•	TanStack Query
+•	React Hook Form
+•	Zod
+•	Socket.IO Client
+Backend:
+•	Node.js
+•	Express 5
+•	TypeScript
+•	Drizzle ORM
+•	PostgreSQL
+•	Zod
+•	OpenAPI
+•	Socket.IO
+•	JWT Authentication
+•	Refresh Token system
+•	Role-Based Access Control
+Architecture Requirements
+Use a clean layered backend:
+Routes
+↓
+Controllers
+↓
+Services / Business Logic
+↓
+Repositories / Database Layer
+↓
+PostgreSQL
+Do not place complex business logic directly inside route files.
+Create reusable modules and shared TypeScript types.
+Authentication
+Implement:
+•	Secure login
+•	Logout
+•	Password hashing
+•	Access tokens
+•	Refresh tokens
+•	Secure token storage
+•	Session expiry
+•	Multiple device login management
+•	Password reset architecture
+•	Account status
+•	Login audit logs
+User Roles
+Create:
+1.	Super Admin
+2.	Admin
+3.	Operator
+4.	Viewer
+Permissions must be enforced on the backend, not only hidden in the frontend.
+Create middleware similar to:
+authenticateUser()
+authorizeRole()
+checkPermission()
+Main Modules
+Dashboard
+Display:
+•	Today's customers
+•	Today's revenue
+•	Monthly revenue
+•	Pending payments
+•	Pending services
+•	Completed services
+•	Recent activity
+•	Most used services
+•	Operator performance
+•	Interactive charts
+Customer Management
+Features:
+•	Add customer
+•	Edit customer
+•	Search customer
+•	Customer unique ID
+•	Mobile number validation
+•	Duplicate detection
+•	Customer profile
+•	Service history
+•	Payment history
+•	Uploaded documents
+•	Notification history
+•	Complete activity timeline
+Service Management
+Allow administrators to:
+•	Add service
+•	Edit service
+•	Delete service
+•	Activate/deactivate service
+•	Create categories
+•	Set default pricing
+•	Add portal links
+•	Add icons
+•	Manage service descriptions
+Service Request / Work Management
+Each customer can have multiple service requests.
+Statuses:
+•	New
+•	Document Pending
+•	In Progress
+•	Submitted
+•	Completed
+•	Rejected
+•	Cancelled
+Each request should include:
+•	Unique request number
+•	Customer
+•	Service
+•	Assigned operator
+•	Status
+•	Priority
+•	Notes
+•	Total amount
+•	Paid amount
+•	Balance amount
+•	Created date
+•	Updated date
+Financial Management
+Create:
+•	Income records
+•	Expense records
+•	Payment records
+•	Pending payment tracking
+•	Daily reports
+•	Monthly reports
+•	Service-wise revenue
+•	Operator-wise revenue
+•	Profit calculations
+Banking Module
+Preserve and improve:
+•	Banking portal links
+•	Passbook generator
+•	Customer banking records
+•	Print functionality
+•	PDF export
+•	PNG export
+Document Management
+Allow secure document upload.
+Store files using cloud object storage or another scalable file system.
+Store only file metadata and secure URLs in PostgreSQL.
+Include:
+•	Upload
+•	Preview
+•	Download
+•	Delete
+•	File type validation
+•	File size validation
+•	Access control
+Reports
+Generate:
+•	Daily report
+•	Weekly report
+•	Monthly report
+•	Customer report
+•	Service-wise report
+•	Payment report
+•	Pending work report
+•	Staff performance report
+Support:
+•	PDF
+•	Excel
+•	Print
+Real-Time Synchronization
+Implement Socket.IO or WebSocket architecture.
+When records change, emit events such as:
+customer:created
+customer:updated
+customer:deleted
+service:created
+service:updated
+service:deleted
+serviceRequest:created
+serviceRequest:updated
+serviceRequest:statusChanged
+payment:created
+notification:created
+All connected clients must receive the update.
+After receiving an event, automatically update the relevant TanStack Query cache or invalidate and refetch the relevant query.
+The user should not need to manually refresh the browser.
+Conflict Prevention
+Implement optimistic concurrency control.
+Every important editable record should include:
+•	updated_at
+•	version
+Before updating:
+IF client.version equals database.version:
+update record
+increment version
+ELSE:
+return conflict error
+reload latest record
+allow user to review changes
+Prevent silent overwriting when two computers edit the same record simultaneously.
+Audit Logs
+Every important action must be recorded:
+•	User ID
+•	Action
+•	Module
+•	Record ID
+•	Old data
+•	New data
+•	Timestamp
+•	Device information where available
+Track:
+CREATE
+UPDATE
+DELETE
+LOGIN
+LOGOUT
+STATUS_CHANGE
+PAYMENT
+Notification System
+Create an event-driven notification system.
+Examples:
+When service status becomes Completed:
+create notification event
+check if notification already sent
+send WhatsApp/SMS/Email through configured provider
+save notification result
+prevent duplicate messages
+Use a background job architecture for notifications.
+Do not make the user wait for a third-party notification API before receiving a successful response.
+Database Design
+Create normalized PostgreSQL tables:
+users
+roles
+permissions
+customers
+service_categories
+services
+service_requests
+payments
+expenses
+documents
+notifications
+notification_logs
+audit_logs
+refresh_tokens
+system_settings
+Use proper:
+•	Primary keys
+•	Foreign keys
+•	Indexes
+•	created_at
+•	updated_at
+•	version fields where required
+Use transactions for multi-step financial or business operations.
+API Design
+Use versioned APIs:
+/api/v1/auth
+/api/v1/users
+/api/v1/customers
+/api/v1/services
+/api/v1/service-requests
+/api/v1/payments
+/api/v1/expenses
+/api/v1/documents
+/api/v1/reports
+/api/v1/notifications
+/api/v1/settings
+/api/v1/audit-logs
+Follow REST conventions.
+Use:
+GET
+POST
+PATCH
+DELETE
+Create consistent API responses:
+{
+"success": true,
+"message": "Operation successful",
+"data": {}
+}
+Error format:
+{
+"success": false,
+"message": "Validation failed",
+"errors": []
+}
+Validation and Security
+Implement:
+•	Server-side Zod validation
+•	Client-side validation
+•	Password hashing
+•	JWT verification
+•	Role authorization
+•	Rate limiting
+•	CORS configuration
+•	Security headers
+•	Input sanitization
+•	File validation
+•	Environment variables
+•	Secure error handling
+•	SQL injection protection through ORM
+•	Audit logging
+Never expose:
+•	Database passwords
+•	JWT secrets
+•	API keys
+•	Private environment variables
+Frontend Requirements
+Maintain the professional Airnet Computers design identity.
+Use:
+Primary color: #032e60
+Create a modern responsive dashboard with:
+•	Desktop sidebar
+•	Mobile responsive navigation
+•	Search
+•	Filters
+•	Pagination
+•	Sorting
+•	Loading skeletons
+•	Empty states
+•	Error states
+•	Confirmation dialogs
+•	Toast notifications
+Use reusable components.
+Do not duplicate the same UI logic across multiple pages.
+Data Fetching
+Use TanStack Query.
+Each resource should have:
+•	Query hooks
+•	Mutation hooks
+•	Loading state
+•	Error state
+•	Cache invalidation
+•	Optimistic updates where appropriate
+Example:
+useCustomers()
+useCustomer(id)
+useCreateCustomer()
+useUpdateCustomer()
+useDeleteCustomer()
+Backend Algorithm
+For every request:
+1.	Receive request
+2.	Authenticate user
+3.	Authorize user permission
+4.	Validate input
+5.	Execute business rules
+6.	Begin transaction if required
+7.	Save data
+8.	Create audit log
+9.	Commit transaction
+10.	Emit real-time event
+11.	Return structured response
+If any critical operation fails:
+Rollback transaction.
+Deployment
+Prepare the application for production deployment.
+Use environment variables for:
+DATABASE_URL
+JWT_SECRET
+REFRESH_TOKEN_SECRET
+FRONTEND_URL
+API_URL
+SOCKET_URL
+STORAGE_CONFIGURATION
+NOTIFICATION_CONFIGURATION
+Configure:
+•	Production CORS
+•	HTTPS
+•	Database migrations
+•	Error logging
+•	Health check endpoint
+•	Backup strategy
+Create:
+GET /health
+Response:
+{
+"status": "healthy",
+"database": "connected"
+}
+Code Quality
+Requirements:
+•	Strict TypeScript
+•	No unnecessary any types
+•	Modular architecture
+•	Reusable components
+•	Clear naming
+•	Comments only where useful
+•	No hard-coded secrets
+•	No duplicate business logic
+•	Proper error handling
+•	Production-ready folder structure
+Final Goal
+The completed Airnet Computers application must behave like a centralized business management system.
+Example:
+Computer A:
+Creates customer
+↓
+Data saved in central PostgreSQL database
+↓
+Backend emits customer:created event
+↓
+Computer B, Computer C, mobile devices, and all active sessions automatically receive the new data
+↓
+All devices display the same current information without manual refresh.
+Build the system in phases.
+Phase 1:
+Authentication, users, roles, centralized database
+Phase 2:
+Customer management and real-time synchronization
+Phase 3:
+Services and service request workflow
+Phase 4:
+Payments and financial management
+Phase 5:
+Documents and notification system
+Phase 6:
+Reports and analytics
+Phase 7:
+Security, audit logs, backups, testing, and production deployment
+Before implementing each major phase, inspect the existing codebase and reuse compatible existing structures rather than unnecessarily replacing working functionality.
+My recommended development order
+For your existing project, I would build it in this order:
+Step 1 — Stabilize the current project
+Keep the existing React, Express, PostgreSQL, Drizzle, Zod, and OpenAPI setup.
+Step 2 — Add authentication
+Create Admin and Operator login.
+Step 3 — Improve database
+Create proper tables, relationships, indexes, timestamps, and audit logs.
+Step 4 — Build Customer Management
+This should become the central module.
+Step 5 — Build Service Request Management
+Connect every service to a customer and operator.
+Step 6 — Add real-time synchronization
+Add Socket.IO so all computers update automatically.
+Step 7 — Add payments and financial records
+Step 8 — Add document management
+Step 9 — Add notification automation
+Step 10 — Reports, backups, security, and deployment
+Important: For your “universal” requirement, the combination of central PostgreSQL + backend API + Socket.IO/WebSockets is what will make the changes made on one computer reflect across all other connected computers when the website is live.
+
