@@ -84,7 +84,7 @@ function App() {
 
   return (
     <div className="noise min-h-[100dvh] overflow-x-hidden bg-[#f4efe4] text-[#15263b]">
-      <header className="relative z-40 border-b border-[#263c55] bg-[#0a1728] text-[#f8f4eb]">
+      <header className="relative z-40 border-b border-[#1e4b75] bg-[#061f3d] text-[#f8f4eb]">
         <div className="container-airnet flex h-[78px] items-center justify-between gap-5">
           <button data-testid="button-logo" onClick={() => scrollTo("top")} className="group flex items-center gap-3 text-left">
             <img src={logoImage} alt="Airnet Computer logo" className="h-12 w-12 rounded-[12px] bg-white object-contain shadow-[4px_4px_0_#06101e] transition-transform group-hover:-translate-y-0.5" />
@@ -111,7 +111,7 @@ function App() {
             </button>
           </div>
         </div>
-        {mobileOpen && <nav className="mobile-only border-t border-[#263c55] bg-[#101f33] px-5 py-5">
+        {mobileOpen && <nav className="mobile-only border-t border-[#1e4b75] bg-[#0a294c] px-5 py-5">
           <div className="container-airnet flex flex-col gap-4 text-sm font-semibold">
             {[["Services", "services"], ["How it works", "how-it-works"], ["Documents", "documents"], ["Visit us", "visit"]].map(([label, id]) => (
               <button data-testid={`mobile-link-${id}`} key={id} onClick={() => scrollTo(id)} className="border-b border-[#355779] py-2 text-left text-[#e1e9ef]">{label}</button>
