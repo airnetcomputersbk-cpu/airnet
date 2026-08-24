@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import logoImage from "@assets/LOGO_1787581255968.png";
 import {
   ArrowRight, ArrowUpRight, BadgeCheck, Camera, Check, ChevronDown,
   CircleHelp, ClipboardList, Clock3, FileCheck2, FileText, IdCard,
@@ -83,15 +84,13 @@ function App() {
 
   return (
     <div className="noise min-h-[100dvh] overflow-x-hidden bg-[#f4efe4] text-[#15263b]">
-      <header className="relative z-40 border-b border-[#224a76] bg-[#032e60] text-[#f8f4eb]">
+      <header className="relative z-40 border-b border-[#263c55] bg-[#0a1728] text-[#f8f4eb]">
         <div className="container-airnet flex h-[78px] items-center justify-between gap-5">
           <button data-testid="button-logo" onClick={() => scrollTo("top")} className="group flex items-center gap-3 text-left">
-            <span className="grid h-10 w-10 place-items-center rounded-[12px] bg-[#f2b544] text-[#032e60] shadow-[4px_4px_0_#0b2340] transition-transform group-hover:-translate-y-0.5">
-              <span className="font-display text-xl font-bold">A</span>
-            </span>
+            <img src={logoImage} alt="Airnet Computer logo" className="h-12 w-12 rounded-[12px] bg-white object-contain shadow-[4px_4px_0_#06101e] transition-transform group-hover:-translate-y-0.5" />
             <span>
-              <span className="font-display block text-[18px] font-bold leading-none tracking-[-.04em]">airnet</span>
-              <span className="mt-1 block text-[9px] font-bold uppercase tracking-[.16em] text-[#afd0d4]">online seva desk</span>
+              <span className="font-display block text-[17px] font-bold leading-none tracking-[-.04em]">Airnet Computer</span>
+              <span className="mt-1 block text-[9px] font-bold uppercase tracking-[.16em] text-[#afd0d4]">Online Service Center</span>
             </span>
           </button>
           <nav className="desktop-only flex items-center gap-7 text-[13px] font-semibold text-[#cfdae3]">
@@ -112,7 +111,7 @@ function App() {
             </button>
           </div>
         </div>
-        {mobileOpen && <nav className="mobile-only border-t border-[#224a76] bg-[#062754] px-5 py-5">
+        {mobileOpen && <nav className="mobile-only border-t border-[#263c55] bg-[#101f33] px-5 py-5">
           <div className="container-airnet flex flex-col gap-4 text-sm font-semibold">
             {[["Services", "services"], ["How it works", "how-it-works"], ["Documents", "documents"], ["Visit us", "visit"]].map(([label, id]) => (
               <button data-testid={`mobile-link-${id}`} key={id} onClick={() => scrollTo(id)} className="border-b border-[#355779] py-2 text-left text-[#e1e9ef]">{label}</button>
@@ -127,7 +126,7 @@ function App() {
           <div className="container-airnet relative grid min-h-[590px] items-center gap-12 py-14 lg:grid-cols-[1.04fr_.96fr] lg:py-16">
             <div className="relative z-10 max-w-[615px]">
               <div className="fade-up mb-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[.18em] text-[#a5d8c9]">
-                <span className="h-px w-8 bg-[#f2b544]" /> Your local digital seva center
+                <span className="h-px w-8 bg-[#f2b544]" /> Your local online service center
               </div>
               <h1 data-testid="text-hero-heading" className="fade-up font-display text-[clamp(3rem,7vw,5.7rem)] font-bold leading-[.92] tracking-[-.075em]">
                 Online services,<br /><span className="text-[#f2b544]">locally explained.</span>
@@ -151,7 +150,7 @@ function App() {
             <div className="relative min-h-[390px] lg:min-h-[440px]">
               <div className="absolute right-[4%] top-[6%] w-[min(390px,88%)] rotate-[-4deg] rounded-[24px] border border-[#7796aa] bg-[#174675] p-3 shadow-[20px_24px_0_rgba(2,19,41,.4)]">
                 <div className="relative min-h-[300px] rounded-[15px] bg-[#f6f0e4] p-5 text-[#032e60]">
-                  <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[.14em] text-[#177d70]"><span>airnet / seva desk</span><span>open today</span></div>
+                  <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[.14em] text-[#177d70]"><span>Airnet Computers Online Service center</span><span>open today</span></div>
                   <div className="mt-8 grid grid-cols-[1fr_auto] gap-4">
                     <div>
                       <p className="font-display text-[35px] font-bold leading-[.93] tracking-[-.07em]">Bring the<br /><span className="text-[#d96f4a]">paperwork.</span></p>
@@ -212,7 +211,7 @@ function App() {
               <button data-testid="button-clear-service-search" onClick={() => { setSearch(""); setActiveCategory("All"); }} className="mt-4 text-xs font-bold text-[#177d70] underline underline-offset-4">Clear filters</button>
             </div>}
             <div className="mt-7 flex flex-col items-start justify-between gap-4 border-t border-[#ddd4c5] pt-5 sm:flex-row sm:items-center">
-              <span className="flex items-center gap-2 text-xs text-[#6b797b]"><MapPin size={14} className="text-[#d96f4a]" /> Visit the Airnet desk for help in person</span>
+              <span className="flex items-center gap-2 text-xs text-[#6b797b]"><MapPin size={14} className="text-[#d96f4a]" /> Visit Airnet Computers for help in person</span>
               <button data-testid="button-service-help" onClick={() => setModal("contact")} className="flex items-center gap-2 text-xs font-bold text-[#032e60]">Not sure which service? Talk to us <ArrowUpRight size={14} /></button>
             </div>
           </div>
@@ -279,11 +278,11 @@ function App() {
         <section id="visit" className="section-pad bg-[#032e60] text-[#f8f4eb]">
           <div className="container-airnet grid gap-12 lg:grid-cols-[1fr_.82fr]">
             <div>
-              <p className="eyebrow text-[#a5d8c9]">Find your local online desk</p>
+              <p className="eyebrow text-[#a5d8c9]">Find Airnet Computers Online Service center</p>
               <h2 className="font-display mt-3 max-w-[560px] text-5xl font-bold leading-[.95] tracking-[-.07em] md:text-6xl">Bring the form.<br /><span className="text-[#f2b544]">Leave with a plan.</span></h2>
               <div className="mt-9 grid gap-5 text-sm text-[#c5d5df] sm:grid-cols-2">
-                 <div className="flex gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>Opp. Congress Office (Talampally Foundation)<br />Haralayya Chowk, Basavakalyan – 585327<br />Bidar, Karnataka, India</span></div>
-                 <div className="flex gap-3"><Clock3 size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Mon–Fri 9am–5:30pm<br />Sat 9am–1pm</span></div>
+                 <div className="flex gap-3"><MapPin size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>Opp. Congress Office, Near Omer Masjid<br />Haralayya Chowk, Basavakalyan – 585327</span></div>
+                 <div className="flex gap-3"><Clock3 size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Mon–Sat 10 AM to 10 PM<br />Sun 1 PM to 9 PM</span></div>
                  <div className="flex gap-3"><Phone size={18} className="mt-0.5 shrink-0 text-[#f2b544]" /><span>Md Amjad Ali<br />+91 7892881086</span></div>
                  <div className="flex gap-3"><Mail size={18} className="mt-0.5 shrink-0 text-[#a5d8c9]" /><span>Call Md Amjad Ali<br />for help with your application</span></div>
               </div>
@@ -292,7 +291,7 @@ function App() {
             <div className="relative min-h-[290px] overflow-hidden rounded-2xl border border-[#355779] bg-[#0d3a69] p-6">
               <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "linear-gradient(#6c8ba2 1px, transparent 1px), linear-gradient(90deg, #6c8ba2 1px, transparent 1px)", backgroundSize: "44px 44px" }} />
               <div className="relative flex h-full flex-col justify-between">
-                <div className="flex items-start justify-between"><div className="rounded-lg bg-[#f2b544] px-3 py-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#032e60]">Airnet online seva desk</div><div className="grid h-10 w-10 place-items-center rounded-full border border-[#f2b544] text-[#f2b544]"><MapPin size={18} /></div></div>
+                 <div className="flex items-start justify-between"><div className="rounded-lg bg-[#f2b544] px-3 py-2 text-[10px] font-bold uppercase tracking-[.12em] text-[#032e60]">Airnet Computers Online Service center</div><div className="grid h-10 w-10 place-items-center rounded-full border border-[#f2b544] text-[#f2b544]"><MapPin size={18} /></div></div>
                 <div className="self-center text-center"><div className="mx-auto mb-3 h-3 w-3 rounded-full bg-[#f2b544] shadow-[0_0_0_8px_rgba(242,181,68,.18)]" /><p className="font-display text-2xl font-bold tracking-[-.05em]">Friendly help<br />for online forms</p></div>
                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-[.16em] text-[#9bb2c3]"><span>walk in welcome</span><span>clear next step</span></div>
               </div>
@@ -303,7 +302,7 @@ function App() {
 
       <footer className="bg-[#02234a] py-8 text-[#95aec0]">
         <div className="container-airnet flex flex-col justify-between gap-5 text-xs md:flex-row md:items-center">
-          <span className="font-display font-bold text-[#f8f4eb]">airnet online seva desk</span>
+          <span className="font-display font-bold text-[#f8f4eb]">Airnet Computers Online Service center</span>
           <span>Practical online help, close to home.</span>
           <div className="flex gap-5"><button data-testid="footer-link-privacy" onClick={() => flash("We handle your documents carefully and only for the service you request.")} className="hover:text-[#f2b544]">Privacy</button><button data-testid="footer-link-contact" onClick={() => setModal("contact")} className="hover:text-[#f2b544]">Contact</button></div>
         </div>
