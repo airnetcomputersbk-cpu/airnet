@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import logoImage from "@assets/LOGO_1787581255968.png";
+import storefrontImage from "@assets/WhatsApp_Image_2026-08-27_at_10.54.13_AM_1787836315161.jpeg";
 import {
   ArrowRight, ArrowUpRight, BadgeCheck, Camera, Check, ChevronDown,
   CircleHelp, ClipboardList, Clock3, FileCheck2, FileText, IdCard,
@@ -148,24 +149,9 @@ function App() {
               </div>
             </div>
             <div className="relative min-h-[390px] lg:min-h-[440px]">
-              <div className="absolute right-[4%] top-[6%] w-[min(390px,88%)] rotate-[-4deg] rounded-[24px] border border-[#7796aa] bg-[#174675] p-3 shadow-[20px_24px_0_rgba(2,19,41,.4)]">
-                <div className="relative min-h-[300px] rounded-[15px] bg-[#f6f0e4] p-5 text-[#032e60]">
-                  <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-[.14em] text-[#177d70]"><span>Airnet Computers Online Service center</span><span>open today</span></div>
-                  <div className="mt-8 grid grid-cols-[1fr_auto] gap-4">
-                    <div>
-                      <p className="font-display text-[35px] font-bold leading-[.93] tracking-[-.07em]">Bring the<br /><span className="text-[#d96f4a]">paperwork.</span></p>
-                      <p className="mt-5 max-w-[210px] text-[11px] leading-5 text-[#62727b]">We make the online part feel a lot less online.</p>
-                    </div>
-                    <div className="service-pattern grid h-24 w-24 place-items-center rounded-full border-2 border-[#d96f4a] text-center text-[9px] font-bold uppercase leading-3 tracking-[.1em] text-[#d96f4a]">apply<br />track<br />done</div>
-                  </div>
-                  <div className="absolute bottom-5 left-5 right-5 border-t border-[#d9cfbe] pt-3 text-[9px] font-bold uppercase tracking-[.13em] text-[#809092]">PAN · Voter ID · Certificates · Forms</div>
-                </div>
-              </div>
-              <div className="absolute bottom-[3%] left-[1%] w-[195px] rotate-[5deg] rounded-[16px] border border-[#e6d2a7] bg-[#f7e7bd] p-4 text-[#153451] shadow-[10px_12px_0_rgba(2,19,41,.22)]">
-                <Sparkles size={19} className="mb-4 text-[#d96f4a]" />
-                <p className="font-display text-[20px] font-bold leading-tight tracking-[-.04em]">No jargon.<br />No guessing.</p>
-                <p className="mt-3 text-[10px] leading-4 text-[#52616b]">Just a clear checklist and a next step.</p>
-              </div>
+               <div className="absolute right-[4%] top-[6%] w-[min(390px,88%)] rotate-[-4deg] overflow-hidden rounded-[24px] border border-[#7796aa] bg-[#174675] shadow-[20px_24px_0_rgba(2,19,41,.4)]">
+                 <img src={storefrontImage} alt="Airnet Computers Online Service Center in Basavakalyan" className="block aspect-[4/3] h-auto w-full object-cover" />
+               </div>
               <div className="absolute right-[-2%] top-[1%] h-14 w-14 rounded-full border border-[#f2b544] opacity-60" />
               <div className="absolute right-[2%] top-[8%] h-2 w-2 rounded-full bg-[#f2b544]" />
             </div>
