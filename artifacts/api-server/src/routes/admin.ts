@@ -90,7 +90,7 @@ adminRouter.get("/gmail/callback", async (req, res) => {
   const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "localhost:5000";
   const proto = (req.headers["x-forwarded-proto"] as string) || (req.secure ? "https" : "http");
   const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-  const frontendBase = process.env.FRONTEND_URL || fallbackOrigin;
+  const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
   try {
     const code = req.query.code as string;
     const error = req.query.error as string;
@@ -122,7 +122,7 @@ adminRouter.get("/google-drive/callback", async (req, res) => {
   const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "localhost:5000";
   const proto = (req.headers["x-forwarded-proto"] as string) || (req.secure ? "https" : "http");
   const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-  const frontendBase = process.env.FRONTEND_URL || fallbackOrigin;
+  const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
   try {
     const code = req.query.code as string;
     const error = req.query.error as string;
@@ -2255,7 +2255,7 @@ adminRouter.get("/google-drive/auth", async (req, res) => {
         customOrigin = refUrl.origin;
       } catch {}
     }
-    const origin = customOrigin || "http://localhost:5000";
+    const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || "http://localhost:5000";
     const result = await generateDriveAuthUrl(origin);
     res.json(result);
   } catch (err: any) {

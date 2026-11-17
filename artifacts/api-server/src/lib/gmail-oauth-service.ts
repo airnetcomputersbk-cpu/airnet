@@ -71,7 +71,7 @@ export function getRedirectUri(customOrigin?: string): string {
   if (process.env.GMAIL_REDIRECT_URI) {
     return process.env.GMAIL_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.BASE_URL || "http://localhost:5001";
+  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5001";
   return `${origin.replace(/\/$/, "")}/api/admin/gmail/callback`;
 }
 

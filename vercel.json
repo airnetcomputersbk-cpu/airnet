@@ -1,20 +1,45 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "public",
+  "services": {
+    "airnet-computers": {
+      "root": "artifacts/airnet-computers",
+      "framework": "vite"
+    },
+    "api-server": {
+      "root": "artifacts/api-server",
+      "framework": "express",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "airnet-computers",
+          "format": "url",
+          "env": "AIRNET_COMPUTERS_URL"
+        }
+      ]
+    },
+    "mockup-sandbox": {
+      "root": "artifacts/mockup-sandbox",
+      "framework": "vite"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": {
+        "service": "api-server"
+      }
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "/api"
+      "destination": {
+        "service": "api-server"
+      }
     },
     {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": {
+        "service": "airnet-computers"
+      }
     }
   ],
   "headers": [

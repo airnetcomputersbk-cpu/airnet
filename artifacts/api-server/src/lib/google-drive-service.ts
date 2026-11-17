@@ -217,7 +217,7 @@ export function getDriveRedirectUri(customOrigin?: string): string {
   if (process.env.GOOGLE_DRIVE_REDIRECT_URI) {
     return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.BASE_URL || "http://localhost:5000";
+  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5000";
   return `${origin.replace(/\/$/, "")}/api/admin/google-drive/callback`;
 }
 
