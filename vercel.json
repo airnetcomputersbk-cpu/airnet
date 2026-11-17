@@ -16,10 +16,6 @@
           "env": "AIRNET_COMPUTERS_URL"
         }
       ]
-    },
-    "mockup-sandbox": {
-      "root": "artifacts/mockup-sandbox",
-      "framework": "vite"
     }
   },
   "rewrites": [

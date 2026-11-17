@@ -8,8 +8,8 @@ import { PathwayProvider } from './context/PathwayContext.tsx';
 import PathwayWindow from './components/PathwayWindow.tsx';
 import './index.css';
 
+import PathwayPopout from './pages/admin/PathwayPopout.tsx';
 const AdminLayout = lazy(() => import('./pages/admin/Layout.tsx'));
-const PathwayPopout = lazy(() => import('./pages/admin/PathwayPopout.tsx'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
