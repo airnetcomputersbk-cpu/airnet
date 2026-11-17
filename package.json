@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/run-all.mjs",
     "start": "node scripts/run-all.mjs",
-    "build": "pnpm -r --if-present run build",
+    "build": "pnpm -r --if-present run build && node scripts/copy-build.mjs",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
