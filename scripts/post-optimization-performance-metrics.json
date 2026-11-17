@@ -1,0 +1,482 @@
+{
+  "timestamp": "2026-11-07T13:13:30.714Z",
+  "database": {
+    "networkRTT": {
+      "samples": [
+        262.8,
+        263.2,
+        268.7,
+        273.5,
+        274
+      ],
+      "avgMs": 268.4,
+      "medianMs": 268.7,
+      "minMs": 262.8,
+      "maxMs": 274
+    },
+    "queries": [
+      {
+        "name": "SELECT FROM services",
+        "rowCount": 16,
+        "avgMs": 270.8,
+        "minMs": 264.7,
+        "maxMs": 280.1,
+        "queryPlan": "Sort  (cost=1.48..1.52 rows=16 width=293) |   Sort Key: order_index |   ->  Seq Scan on services  (cost=0.00..1.16 rows=16 width=293)"
+      },
+      {
+        "name": "SELECT FROM enquiries ORDER BY created_at DESC",
+        "rowCount": 17,
+        "avgMs": 267.4,
+        "minMs": 266.1,
+        "maxMs": 269.2,
+        "queryPlan": "Sort  (cost=1.52..1.56 rows=17 width=288) |   Sort Key: created_at DESC |   ->  Seq Scan on enquiries  (cost=0.00..1.17 rows=17 width=288)"
+      },
+      {
+        "name": "SELECT FROM application_tasks ORDER BY created_at DESC",
+        "rowCount": 6,
+        "avgMs": 332.4,
+        "minMs": 267.7,
+        "maxMs": 419.7,
+        "queryPlan": "Sort  (cost=1.14..1.15 rows=6 width=448) |   Sort Key: created_at DESC |   ->  Seq Scan on application_tasks  (cost=0.00..1.06 rows=6 width=448)"
+      },
+      {
+        "name": "SELECT FROM notifications WHERE status = 'Published'",
+        "rowCount": 7,
+        "avgMs": 266.6,
+        "minMs": 264.5,
+        "maxMs": 268.9,
+        "queryPlan": "Sort  (cost=1.10..1.10 rows=1 width=473) |   Sort Key: created_at DESC |   ->  Seq Scan on notifications  (cost=0.00..1.09 rows=1 width=473) |         Filter: (status = 'Published'::text)"
+      },
+      {
+        "name": "SELECT FROM records ORDER BY created_at DESC",
+        "rowCount": 1,
+        "avgMs": 267.1,
+        "minMs": 263.7,
+        "maxMs": 273.8,
+        "queryPlan": "Sort  (cost=1.02..1.02 rows=1 width=216) |   Sort Key: created_at DESC |   ->  Seq Scan on records  (cost=0.00..1.01 rows=1 width=216)"
+      },
+      {
+        "name": "LOOKUP application_tasks BY mobile_number (indexed)",
+        "rowCount": 1,
+        "avgMs": 265.1,
+        "minMs": 263.4,
+        "maxMs": 268,
+        "queryPlan": "Seq Scan on application_tasks  (cost=0.00..1.07 rows=1 width=448) |   Filter: (mobile_number ~~ '%7892881086%'::text)"
+      },
+      {
+        "name": "LOOKUP enquiries BY customer_id (indexed)",
+        "rowCount": 0,
+        "avgMs": 276.8,
+        "minMs": 262.3,
+        "maxMs": 290,
+        "queryPlan": "Seq Scan on enquiries  (cost=0.00..1.21 rows=1 width=288) |   Filter: (customer_id = 'AN-10001'::text)"
+      },
+      {
+        "name": "LOOKUP notifications BY is_featured (indexed)",
+        "rowCount": 3,
+        "avgMs": 274.2,
+        "minMs": 262.7,
+        "maxMs": 290.2,
+        "queryPlan": "Seq Scan on notifications  (cost=0.00..1.07 rows=4 width=473) |   Filter: is_featured"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "application_tasks",
+        "indexname": "application_tasks_pkey",
+        "indexdef": "CREATE UNIQUE INDEX application_tasks_pkey ON public.application_tasks USING btree (id)"
+      },
+      {
+        "tablename": "application_tasks",
+        "indexname": "idx_app_tasks_created_at_desc",
+        "indexdef": "CREATE INDEX idx_app_tasks_created_at_desc ON public.application_tasks USING btree (created_at DESC)"
+      },
+      {
+        "tablename": "application_tasks",
+        "indexname": "idx_app_tasks_customer_id",
+        "indexdef": "CREATE INDEX idx_app_tasks_customer_id ON public.application_tasks USING btree (customer_id)"
+      },
+      {
+        "tablename": "application_tasks",
+        "indexname": "idx_app_tasks_mobile_number",
+        "indexdef": "CREATE INDEX idx_app_tasks_mobile_number ON public.application_tasks USING btree (mobile_number)"
+      },
+      {
+        "tablename": "application_tasks",
+        "indexname": "idx_app_tasks_status",
+        "indexdef": "CREATE INDEX idx_app_tasks_status ON public.application_tasks USING btree (status)"
+      },
+      {
+        "tablename": "chat_conversations",
+        "indexname": "chat_conversations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX chat_conversations_pkey ON public.chat_conversations USING btree (id)"
+      },
+      {
+        "tablename": "chat_messages",
+        "indexname": "chat_messages_pkey",
+        "indexdef": "CREATE UNIQUE INDEX chat_messages_pkey ON public.chat_messages USING btree (id)"
+      },
+      {
+        "tablename": "chat_messages",
+        "indexname": "idx_chat_messages_conv_id",
+        "indexdef": "CREATE INDEX idx_chat_messages_conv_id ON public.chat_messages USING btree (conversation_id)"
+      },
+      {
+        "tablename": "daily_report_logs",
+        "indexname": "daily_report_logs_pkey",
+        "indexdef": "CREATE UNIQUE INDEX daily_report_logs_pkey ON public.daily_report_logs USING btree (id)"
+      },
+      {
+        "tablename": "daily_report_logs",
+        "indexname": "idx_report_logs_date",
+        "indexdef": "CREATE INDEX idx_report_logs_date ON public.daily_report_logs USING btree (report_date DESC)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "enquiries_pkey",
+        "indexdef": "CREATE UNIQUE INDEX enquiries_pkey ON public.enquiries USING btree (id)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "idx_enquiries_created_at_desc",
+        "indexdef": "CREATE INDEX idx_enquiries_created_at_desc ON public.enquiries USING btree (created_at DESC)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "idx_enquiries_customer_id",
+        "indexdef": "CREATE INDEX idx_enquiries_customer_id ON public.enquiries USING btree (customer_id)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "idx_enquiries_mobile_number",
+        "indexdef": "CREATE INDEX idx_enquiries_mobile_number ON public.enquiries USING btree (mobile_number)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "idx_enquiries_status",
+        "indexdef": "CREATE INDEX idx_enquiries_status ON public.enquiries USING btree (application_status)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "idx_notifications_category",
+        "indexdef": "CREATE INDEX idx_notifications_category ON public.notifications USING btree (category)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "idx_notifications_created_at_desc",
+        "indexdef": "CREATE INDEX idx_notifications_created_at_desc ON public.notifications USING btree (created_at DESC)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "idx_notifications_featured",
+        "indexdef": "CREATE INDEX idx_notifications_featured ON public.notifications USING btree (is_featured)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "idx_notifications_status",
+        "indexdef": "CREATE INDEX idx_notifications_status ON public.notifications USING btree (status)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_pkey",
+        "indexdef": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+      },
+      {
+        "tablename": "records",
+        "indexname": "idx_records_created_at_desc",
+        "indexdef": "CREATE INDEX idx_records_created_at_desc ON public.records USING btree (created_at DESC)"
+      },
+      {
+        "tablename": "records",
+        "indexname": "idx_records_customer_id",
+        "indexdef": "CREATE INDEX idx_records_customer_id ON public.records USING btree (customer_id)"
+      },
+      {
+        "tablename": "records",
+        "indexname": "idx_records_mobile",
+        "indexdef": "CREATE INDEX idx_records_mobile ON public.records USING btree (mobile_number)"
+      },
+      {
+        "tablename": "records",
+        "indexname": "records_pkey",
+        "indexdef": "CREATE UNIQUE INDEX records_pkey ON public.records USING btree (id)"
+      },
+      {
+        "tablename": "report_settings",
+        "indexname": "report_settings_pkey",
+        "indexdef": "CREATE UNIQUE INDEX report_settings_pkey ON public.report_settings USING btree (id)"
+      },
+      {
+        "tablename": "services",
+        "indexname": "idx_services_active_order",
+        "indexdef": "CREATE INDEX idx_services_active_order ON public.services USING btree (is_active, order_index)"
+      },
+      {
+        "tablename": "services",
+        "indexname": "idx_services_category",
+        "indexdef": "CREATE INDEX idx_services_category ON public.services USING btree (category)"
+      },
+      {
+        "tablename": "services",
+        "indexname": "services_pkey",
+        "indexdef": "CREATE UNIQUE INDEX services_pkey ON public.services USING btree (id)"
+      }
+    ],
+    "multiQueryPenalty": {
+      "sequentialMs": 791.9,
+      "parallelMs": 1388.4,
+      "overheadMs": -596.6,
+      "percentageDifference": -75.3
+    }
+  },
+  "apis": [
+    {
+      "name": "Public Services List",
+      "path": "/api/services",
+      "statusCode": 200,
+      "payloadBytes": 6063,
+      "payloadKb": 5.92,
+      "cacheStatus": "HIT",
+      "avgMs": 11,
+      "medianMs": 9.8,
+      "p95Ms": 15.2,
+      "p99Ms": 15.2,
+      "minMs": 6.3,
+      "maxMs": 15.2
+    },
+    {
+      "name": "Public Notifications List",
+      "path": "/api/notifications",
+      "statusCode": 200,
+      "payloadBytes": 7792,
+      "payloadKb": 7.61,
+      "cacheStatus": "HIT",
+      "avgMs": 10.9,
+      "medianMs": 8.3,
+      "p95Ms": 18.8,
+      "p99Ms": 18.8,
+      "minMs": 3.8,
+      "maxMs": 18.8
+    },
+    {
+      "name": "Public Business Info",
+      "path": "/api/business-info",
+      "statusCode": 200,
+      "payloadBytes": 374,
+      "payloadKb": 0.37,
+      "cacheStatus": "HIT",
+      "avgMs": 13.3,
+      "medianMs": 14.5,
+      "p95Ms": 19,
+      "p99Ms": 19,
+      "minMs": 6,
+      "maxMs": 19
+    },
+    {
+      "name": "Public Application Lookup",
+      "path": "/api/tracker/lookup?query=7892881086",
+      "statusCode": 200,
+      "payloadBytes": 899,
+      "payloadKb": 0.88,
+      "cacheStatus": "N/A",
+      "avgMs": 290.2,
+      "medianMs": 288.7,
+      "p95Ms": 295.8,
+      "p99Ms": 295.8,
+      "minMs": 283.2,
+      "maxMs": 295.8
+    },
+    {
+      "name": "Admin Enquiries (with Tasks + Services Join)",
+      "path": "/api/admin/enquiries",
+      "statusCode": 200,
+      "payloadBytes": 11998,
+      "payloadKb": 11.72,
+      "cacheStatus": "HIT",
+      "avgMs": 13.4,
+      "medianMs": 15.9,
+      "p95Ms": 20.3,
+      "p99Ms": 20.3,
+      "minMs": 5.8,
+      "maxMs": 20.3
+    },
+    {
+      "name": "Admin Application Tracker List",
+      "path": "/api/admin/tracker",
+      "statusCode": 200,
+      "payloadBytes": 6636,
+      "payloadKb": 6.48,
+      "cacheStatus": "HIT",
+      "avgMs": 10.3,
+      "medianMs": 10.4,
+      "p95Ms": 17.1,
+      "p99Ms": 17.1,
+      "minMs": 3.7,
+      "maxMs": 17.1
+    },
+    {
+      "name": "Admin Ledger Records List",
+      "path": "/api/admin/records",
+      "statusCode": 200,
+      "payloadBytes": 280,
+      "payloadKb": 0.27,
+      "cacheStatus": "HIT",
+      "avgMs": 7.3,
+      "medianMs": 5.3,
+      "p95Ms": 15.5,
+      "p99Ms": 15.5,
+      "minMs": 4.3,
+      "maxMs": 15.5
+    },
+    {
+      "name": "Admin Notifications Management",
+      "path": "/api/admin/notifications",
+      "statusCode": 200,
+      "payloadBytes": 7792,
+      "payloadKb": 7.61,
+      "cacheStatus": "HIT",
+      "avgMs": 14.5,
+      "medianMs": 15.2,
+      "p95Ms": 18.2,
+      "p99Ms": 18.2,
+      "minMs": 7.3,
+      "maxMs": 18.2
+    },
+    {
+      "name": "Admin Daily Report Settings",
+      "path": "/api/admin/reports-daily/settings",
+      "statusCode": 200,
+      "payloadBytes": 1863,
+      "payloadKb": 1.82,
+      "cacheStatus": "HIT",
+      "avgMs": 11.2,
+      "medianMs": 11.4,
+      "p95Ms": 15.3,
+      "p99Ms": 15.3,
+      "minMs": 6.3,
+      "maxMs": 15.3
+    },
+    {
+      "name": "Admin AI Suggestions & Analysis",
+      "path": "/api/admin/ai-suggestions",
+      "statusCode": 200,
+      "payloadBytes": 22585,
+      "payloadKb": 22.06,
+      "cacheStatus": "N/A",
+      "avgMs": 16.6,
+      "medianMs": 15.9,
+      "p95Ms": 21.4,
+      "p99Ms": 21.4,
+      "minMs": 13.3,
+      "maxMs": 21.4
+    }
+  ],
+  "bundle": {
+    "assets": [
+      {
+        "file": "AISuggestions-Bk1NiyNd.js",
+        "sizeBytes": 20742,
+        "sizeKb": 20.26,
+        "sizeMb": 0.02
+      },
+      {
+        "file": "ApplicationTracker-BvwtWttQ.js",
+        "sizeBytes": 55350,
+        "sizeKb": 54.05,
+        "sizeMb": 0.05
+      },
+      {
+        "file": "Backup-DtocmKaN.js",
+        "sizeBytes": 31821,
+        "sizeKb": 31.08,
+        "sizeMb": 0.03
+      },
+      {
+        "file": "DailyReports-YYX8ZY8Y.js",
+        "sizeBytes": 57125,
+        "sizeKb": 55.79,
+        "sizeMb": 0.05
+      },
+      {
+        "file": "Dashboard-DTdeul8K.js",
+        "sizeBytes": 34062,
+        "sizeKb": 33.26,
+        "sizeMb": 0.03
+      },
+      {
+        "file": "Enquiries-B7QKn5kY.js",
+        "sizeBytes": 29153,
+        "sizeKb": 28.47,
+        "sizeMb": 0.03
+      },
+      {
+        "file": "index-B4cpO8JU.js",
+        "sizeBytes": 891888,
+        "sizeKb": 870.98,
+        "sizeMb": 0.85
+      },
+      {
+        "file": "index-CrPwDzvz.css",
+        "sizeBytes": 154340,
+        "sizeKb": 150.72,
+        "sizeMb": 0.15
+      },
+      {
+        "file": "Layout-DspOMhye.js",
+        "sizeBytes": 12384,
+        "sizeKb": 12.09,
+        "sizeMb": 0.01
+      },
+      {
+        "file": "Login-CzjibW5f.js",
+        "sizeBytes": 11134,
+        "sizeKb": 10.87,
+        "sizeMb": 0.01
+      },
+      {
+        "file": "LOGO_1787581255968-BCsddExs.png",
+        "sizeBytes": 323587,
+        "sizeKb": 316,
+        "sizeMb": 0.31
+      },
+      {
+        "file": "NotificationsAdmin-D6c-Gxeo.js",
+        "sizeBytes": 48704,
+        "sizeKb": 47.56,
+        "sizeMb": 0.05
+      },
+      {
+        "file": "Records-InpBC8eT.js",
+        "sizeBytes": 35373,
+        "sizeKb": 34.54,
+        "sizeMb": 0.03
+      },
+      {
+        "file": "Reports-DfhCoZNv.js",
+        "sizeBytes": 31778,
+        "sizeKb": 31.03,
+        "sizeMb": 0.03
+      },
+      {
+        "file": "Services-DaQHhI5O.js",
+        "sizeBytes": 15593,
+        "sizeKb": 15.23,
+        "sizeMb": 0.01
+      },
+      {
+        "file": "Settings-DCcw_UCL.js",
+        "sizeBytes": 23433,
+        "sizeKb": 22.88,
+        "sizeMb": 0.02
+      },
+      {
+        "file": "WhatsApp_Image_2026-08-27_at_10.54.13_AM_1787836315161-BzRotLYD.jpeg",
+        "sizeBytes": 154453,
+        "sizeKb": 150.83,
+        "sizeMb": 0.15
+      }
+    ],
+    "totalJsKb": 1268.11,
+    "totalCssKb": 150.72
+  }
+}

@@ -1,0 +1,24 @@
+Online Service	Required Documents	Service Fee / Price
+Aadhaar Print	Aadhaar Number and Mobile Number (Note: Mobile number does not need to be linked to Aadhaar).	₹50
+PAN Card 
+(New Application / Correction)	Aadhaar Card, recent photo, signature, and one DoB proof (Birth Certificate / Matriculation Certificate / Voter ID / Indian Passport / Driving Licence / Marriage Certificate).	₹200
+Voter ID Card 
+(New Application / Correction)	Aadhaar Card, recent photo, one family member’s Voter ID, and 2002 SIR List (containing the name of parents or grandparents).	₹100
+Passport 
+(New Application / Renewal / Correction)	Aadhaar Card, PAN Card, and Matriculation (Class 10) Certificate.	₹2,500 (Govt Fee) + ₹300 (Service Fee) = ₹2,800 total
+Government Job Online Applications	Aadhaar Card, Mobile Number, Educational Marks Cards (10th, 12th, UG/PG Degree), recent photo, and signature.	₹100
+Scholarships 
+(New Application / Renewal)	Aadhaar Card, Educational Marks Cards (10th, 12th, UG/PG Degree), STS Number, and valid Income & Caste Certificates.	₹100
+Income Certificate	Aadhaar Card, Ration Card, old Income Certificate, and one age/school proof (Applicant's 10th T.C. / Shala Dakhila OR a family member's 10th T.C.).	• Urgent: ₹300 
+• Standard (5–7 days): ₹150 
+• Slow (15–20 days): ₹150
+Caste Certificate	Aadhaar Card, Ration Card, old Income Certificate, and one age/school proof (Applicant's 10th T.C. / Shala Dakhila OR a family member's 10th T.C.).	• Urgent: ₹300 
+• Standard (5–7 days): ₹150 
+• Slow (15–20 days): ₹150
+Domicile / Residence Certificate	Aadhaar Card, Ration Card, Voter ID, old Income Certificate, and one school proof (Applicant's 10th T.C. / Shala Dakhila OR a family member's 10th T.C.).	• Urgent: ₹300 
+• Standard (5–7 days): ₹150 
+• Slow (15–20 days): ₹150
+Permanent Residence Certificate (PRC)	Aadhaar Card, Ration Card, Voter ID, Matriculation Certificate, Birth Certificate, Property Tax Paid Receipts, and Self-Declaration / Affidavit.	₹300
+Birth & Death Certificate	Birth Summary / Discharge Slip, parents' Aadhaar Cards, Ration Card, and Voter ID.	To be announced
+Money Transaction via AePS	Bank account seeded with Aadhaar, registered mobile number, and physical presence of the account holder for biometrics.	₹10 charge per ₹1,000 transaction
+Udyam Certificate (MSME)	Aadhaar Card, active Mobile Number, PAN Card, and Bank Account details.	

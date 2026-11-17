@@ -27,7 +27,10 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { 
+  scroll-behavior: smooth;
+  scroll-padding-top: 82px;
+}
 body {
   margin: 0;
   min-width: 320px;
@@ -35,13 +38,28 @@ body {
   color: #15263b;
   font-family: var(--app-font-sans);
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  overflow-wrap: break-word;
+}
+
+header.sticky {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  z-index: 50;
 }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 .font-display { font-family: var(--app-font-display); }
-.container-airnet { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
+
+.container-airnet {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 3.5vw, 32px);
+}
 .eyebrow { color: #177d70; letter-spacing: .16em; text-transform: uppercase; font-size: .7rem; font-weight: 700; }
-.section-pad { padding: 94px 0; }
+.section-pad { padding: clamp(48px, 6.5vw, 92px) 0; }
 .serif-italic { font-family: Georgia, serif; font-style: italic; font-weight: 400; }
 .noise::after {
   content: '';
@@ -73,9 +91,95 @@ button { cursor: pointer; }
   background-image: radial-gradient(#d4c7ad 1px, transparent 1px);
   background-size: 18px 18px;
 }
-@media (max-width: 767px) {
-  .container-airnet { width: min(100% - 28px, 600px); }
-  .section-pad { padding: 68px 0; }
+/* ============================================================== */
+/* VISIBLE CUSTOM SCROLLBARS FOR MESSAGE POPUPS & MODALS          */
+/* Ensures clear visibility and easy scrolling on all browsers    */
+/* ============================================================== */
+.custom-scrollbar,
+.modal-panel,
+.modal-scrollable,
+pre.overflow-y-auto,
+div.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #032e60 #ede6d8;
+  scrollbar-gutter: stable;
+}
+
+/* Webkit Scrollbars (Chrome, Edge, Safari, Opera) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3ece0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #032e60;
+  border-radius: 9999px;
+  border: 2px solid #f3ece0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d96f4a;
+}
+
+/* Emerald themed scrollbar for success/completed popups */
+.custom-scrollbar-emerald {
+  scrollbar-width: thin;
+  scrollbar-color: #059669 #d1fae5;
+  scrollbar-gutter: stable;
+}
+.custom-scrollbar-emerald::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar-emerald::-webkit-scrollbar-track {
+  background: #ecfdf5;
+  border-radius: 9999px;
+}
+.custom-scrollbar-emerald::-webkit-scrollbar-thumb {
+  background: #059669;
+  border-radius: 9999px;
+  border: 2px solid #ecfdf5;
+}
+.custom-scrollbar-emerald::-webkit-scrollbar-thumb:hover {
+  background: #047857;
+}
+
+/* Blue / Slate themed scrollbar for Admin notification message popups & modals */
+.custom-scrollbar-admin {
+  scrollbar-width: thin;
+  scrollbar-color: #2563eb #e2e8f0;
+  scrollbar-gutter: stable;
+}
+.custom-scrollbar-admin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar-admin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+.custom-scrollbar-admin::-webkit-scrollbar-thumb {
+  background: #3b82f6;
+  border-radius: 9999px;
+  border: 2px solid #f1f5f9;
+}
+.custom-scrollbar-admin::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 1023px) {
   .desktop-only { display: none !important; }
 }
-@media (min-width: 768px) { .mobile-only { display: none !important; } }
+@media (min-width: 1024px) {
+  .mobile-only { display: none !important; }
+}
+
+@keyframes modalCountdown {
+  from { width: 100%; }
+  to { width: 0%; }
+}

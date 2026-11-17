@@ -1,0 +1,482 @@
+export interface AIRecommendation {
+  id: string;
+  category:
+    | "New Features"
+    | "Existing Feature Enhancements"
+    | "UI/UX Improvements"
+    | "Performance Optimization"
+    | "Workflow Automation"
+    | "Security Improvements"
+    | "Database & Backend Optimization"
+    | "Reporting & Analytics"
+    | "Future Development Opportunities";
+  name: string;
+  explanation: string;
+  whyNeeded: string;
+  benefits: string;
+  improvement: string;
+  requirements: string;
+  impact: string;
+  priority: "Critical" | "High" | "Medium" | "Low";
+  complexity: "Easy" | "Moderate" | "Advanced";
+  status: "pending" | "approved" | "rejected";
+  updatedAt?: string;
+}
+
+export const INITIAL_AI_RECOMMENDATIONS: AIRecommendation[] = [
+  // =========================================================================
+  // 1. NEW FEATURES
+  // =========================================================================
+  {
+    id: "REC-NF-01",
+    category: "New Features",
+    name: "Citizen Document Pre-Upload & AI OCR Verification",
+    explanation:
+      "Allow citizens submitting an online enquiry to securely upload scans or photos of mandatory documents (Aadhaar, PAN, Marks Cards). Integrate client/server OCR (Tesseract or Vision) to pre-read name, DOB, and ID numbers, alerting the citizen if their uploaded photo is blurry or cropped.",
+    whyNeeded:
+      "Currently, citizens submit text enquiries and either bring physical papers to the shop or send unorganized WhatsApp photos, causing counter delays and manual re-typing of demographic details.",
+    benefits:
+      "Reduces counter service turnaround time by 60%. Prevents typo errors on citizen names and birthdates. Eliminates lost or missing document confusion.",
+    improvement:
+      "Enriches the public enquiry form with an optional drag-and-drop file upload tray. Generates pre-filled data fields for the Admin during Application Tracker creation.",
+    requirements:
+      "Frontend file uploader with image preview compression; backend multi-part file handler saving to secure local storage or Google Cloud Bucket; automated thumbnail generator.",
+    impact:
+      "Enquiry submission payload expands to accept document attachment URLs. Zero disruption to existing text-only enquiries.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+  {
+    id: "REC-NF-02",
+    category: "New Features",
+    name: "Dynamic Bharat UPI QR Code for Customer Balances",
+    explanation:
+      "Generate an automated Bharat UPI QR Code on the public Application Tracker page and invoice receipts displaying the customer's exact outstanding amount (`amountPending`) and Customer ID in the transaction note.",
+    whyNeeded:
+      "Customers checking their tracking status currently see their pending balance in text but must manually ask for the shop UPI ID or pay physically with cash at the counter.",
+    benefits:
+      "Enables instant remote balance collection. Customers can pay via PhonePe, Google Pay, or Paytm directly from the tracker timeline. Accelerates cash flow reconciliation.",
+    improvement:
+      "Adds a 'Pay Now via UPI' button inside the public Tracker timeline when `amountPending > 0`.",
+    requirements:
+      "Client-side QR code generator (`qrcode.react`) formatted with standard NPCI UPI intent link `upi://pay?pa=AIRNET_VPA&pn=Airnet+Computers&am=AMOUNT&tn=AN-XXXXX`.",
+    impact:
+      "Purely additive UI element on public tracker page. Does not modify database schema.",
+    priority: "High",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-NF-03",
+    category: "New Features",
+    name: "Printable Branded Document Requirement Slip",
+    explanation:
+      "Provide a one-click 'Print Requirement Slip' button on services that generates a pocket-sized, branded slip with checkboxes of all required documents, shop helpline, address, and operating hours for citizens to take home.",
+    whyNeeded:
+      "Many rural and elder citizens visit the shop to ask what documents are needed for government schemes (SSP scholarship, Ration card, Caste certificate) and forget verbal instructions.",
+    benefits:
+      "Provides professional branding, eliminates repeat counter queries, and ensures citizens return with 100% of required documents on their next visit.",
+    improvement:
+      "Adds an instant thermal printer or standard A4 slip PDF generator to `/services` and `/admin/services`.",
+    requirements:
+      "Leverage existing PDFKit generator or browser CSS print stylesheet with Airnet logo, service title, and checklist.",
+    impact:
+      "No database changes; utilizes existing `servicesTable.documents` array.",
+    priority: "Medium",
+    complexity: "Easy",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 2. EXISTING FEATURE ENHANCEMENTS
+  // =========================================================================
+  {
+    id: "REC-EF-01",
+    category: "Existing Feature Enhancements",
+    name: "Staff Operator vs Master Admin Role Separation",
+    explanation:
+      "Introduce a lightweight role tier: Master Admin (full authority over settings, financial reports, deletions, password reset) vs Counter Operator (can create enquiries, update tracker steps, add records, but cannot view overall business profit, change admin phone numbers, or purge backup data).",
+    whyNeeded:
+      "Currently, any staff member logged in with password 'rasool' has unrestricted access to master settings, system backups, and daily revenue metrics.",
+    benefits:
+      "Prevents accidental data deletion, protects sensitive business revenue figures, and provides accountable multi-user operation at the counter.",
+    improvement:
+      "Adds an optional operator login mode while preserving the existing master administrator credentials.",
+    requirements:
+      "Add a `role: 'admin' | 'operator'` claim to the signed session token in `admin-auth-service.ts`; add conditional hiding on destructive actions in the UI.",
+    impact:
+      "Non-breaking. Master password continues functioning exactly as it does now.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+  {
+    id: "REC-EF-02",
+    category: "Existing Feature Enhancements",
+    name: "One-Click Official Portal Quick-Launch Links",
+    explanation:
+      "Store official government portal URLs (e.g. Seva Sindhu, NSDL PAN, UIDAI Aadhaar, SSP Scholarship) inside service metadata, providing a 'Launch Portal' button on each task card in the Application Tracker.",
+    whyNeeded:
+      "Staff currently switch tabs and search browser bookmarks to locate official state and central government portals for each different application.",
+    benefits:
+      "Saves counter staff 2 to 3 minutes per application. Guarantees staff always access legitimate government URLs rather than phishing or outdated portals.",
+    improvement:
+      "Renders a direct external link icon next to the service name in `/admin/tracker` and `/admin/enquiries`.",
+    requirements:
+      "Optional `portalUrl` string field in service presets or catalog metadata.",
+    impact:
+      "Zero disruption to existing tracker tasks or database structure.",
+    priority: "Medium",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-EF-03",
+    category: "Existing Feature Enhancements",
+    name: "Bulk Status Actions & Multi-Select in Enquiry List",
+    explanation:
+      "Allow administrators on `/admin/enquiries` to select multiple citizen enquiries using checkboxes and perform batch actions: 'Bulk Accept', 'Bulk Mark On Hold', or 'Export Selected to Excel'.",
+    whyNeeded:
+      "When 20+ enquiries arrive during peak government recruitment drives, clicking and updating each enquiry individually is repetitive and slow.",
+    benefits:
+      "Reduces administrative processing time by 75% during high-volume notification application seasons.",
+    improvement:
+      "Enhances the existing Enquiry table with a master checkbox, selection counter bar, and bulk action dropdown.",
+    requirements:
+      "Frontend state management for selected IDs; backend endpoint `POST /api/admin/enquiries/bulk-status`.",
+    impact:
+      "Works on top of existing `enquiriesTable` using standard SQL `WHERE id IN (...)`.",
+    priority: "Medium",
+    complexity: "Moderate",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 3. UI/UX IMPROVEMENTS
+  // =========================================================================
+  {
+    id: "REC-UI-01",
+    category: "UI/UX Improvements",
+    name: "Regional Multilingual Support (Kannada / Hindi / English)",
+    explanation:
+      "Add a one-click language selector on the public portal header allowing citizens to toggle between English, Kannada (ಕನ್ನಡ), and Hindi (हिन्दी) for service titles, instructions, documents required, and FAQ.",
+    whyNeeded:
+      "Airnet Computers is located in Basavakalyan, Bidar District, Karnataka. A significant portion of local citizens, rural applicants, and elders prefer Kannada or Hindi over English.",
+    benefits:
+      "Significantly increases citizen accessibility, trust, and comprehension of complex government documentation requirements.",
+    improvement:
+      "Integrates lightweight JSON i18n dictionaries for public navigation, hero headers, service categories, and status descriptions.",
+    requirements:
+      "Standard client-side React localization context with locale switcher saved in `localStorage`.",
+    impact:
+      "Zero backend or database changes required. Admin panel remains in English.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+  {
+    id: "REC-UI-02",
+    category: "UI/UX Improvements",
+    name: "Progressive Web App (PWA) Offline-Ready Manifest",
+    explanation:
+      "Configure a Web App Manifest (`manifest.json`) and service worker allowing citizens and shop staff to install Airnet Computers directly onto Android/iOS home screens with an app icon and splash screen.",
+    whyNeeded:
+      "Citizens frequently lose browser bookmarks and struggle to find the tracking link when checking daily application progress.",
+    benefits:
+      "Provides a native app-like experience without app store fees or downloads. Enables instant one-tap tracking access from mobile home screens.",
+    improvement:
+      "Adds `manifest.webmanifest`, service worker caching for static assets, and an install prompt banner.",
+    requirements:
+      "Standard PWA manifest file, icons (`192x192`, `512x512`), and basic cache-first service worker.",
+    impact:
+      "Purely frontend enhancement with zero server impact.",
+    priority: "Medium",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-UI-03",
+    category: "UI/UX Improvements",
+    name: "High-Contrast Counter Mode & Fast Keyboard Shortcuts",
+    explanation:
+      "Implement keyboard shortcuts (e.g. `Ctrl + N` for New Enquiry, `Ctrl + F` for Search, `Ctrl + P` for Print) and an optional high-contrast reading mode for sunny counter desks.",
+    whyNeeded:
+      "Counter operators work 8-10 hours daily handling continuous citizen traffic. Frequent mouse navigation slows down high-speed data entry.",
+    benefits:
+      "Accelerates operator entry speed, reduces eye strain, and optimizes desktop efficiency at the service counter.",
+    improvement:
+      "Adds global `keydown` event listeners to Admin dashboard and enquiry search bars.",
+    requirements:
+      "React hook `useKeyboardShortcuts` mapped to modal opens and search focus.",
+    impact:
+      "Zero side effects on existing workflows.",
+    priority: "Low",
+    complexity: "Easy",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 4. PERFORMANCE OPTIMIZATION
+  // =========================================================================
+  {
+    id: "REC-PO-01",
+    category: "Performance Optimization",
+    name: "Frontend Dynamic Route Code-Splitting",
+    explanation:
+      "Implement `React.lazy()` and `Suspense` chunking across admin sub-routes (`DailyReports.tsx`, `Backup.tsx`, `Records.tsx`, `Reports.tsx`).",
+    whyNeeded:
+      "Currently, Vite bundles all admin pages and chart components into a single 1.25MB JavaScript bundle loaded on initial visit.",
+    benefits:
+      "Reduces initial bundle load size from 1.25MB down to ~280KB. Cuts initial page load time in half, especially on 3G/4G mobile connections.",
+    improvement:
+      "Lazy-loads heavy charting, PDF viewer, and backup libraries only when the administrator actually navigates to those tabs.",
+    requirements:
+      "Wrap route component imports in `React.lazy(() => import('./pages/admin/...'))` with a fallback spinner.",
+    impact:
+      "Preserves exact page functionality and styling while vastly improving loading speed.",
+    priority: "High",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-PO-02",
+    category: "Performance Optimization",
+    name: "PostgreSQL Strategic B-Tree Indexing",
+    explanation:
+      "Add explicit B-Tree database indexes on high-frequency search and foreign key columns: `enquiries(mobile_number)`, `enquiries(customer_id)`, `application_tasks(customer_id)`, `records(customer_id)`, and `notifications(status, target_date)`.",
+    whyNeeded:
+      "Currently, public lookup and admin search queries perform sequential table scans. As the database grows past thousands of records, lookup latency will increase linearly.",
+    benefits:
+      "Guarantees lightning-fast (<5ms) lookup times on customer ID and mobile searches even with 100,000+ customer records.",
+    improvement:
+      "Adds standard index definitions in Drizzle schema and applies non-blocking `CREATE INDEX IF NOT EXISTS` migrations.",
+    requirements:
+      "Execute safe PostgreSQL index creation script on `airnet_db`.",
+    impact:
+      "Completely transparent to application queries. Improves read throughput with zero schema changes.",
+    priority: "High",
+    complexity: "Easy",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 5. WORKFLOW AUTOMATION
+  // =========================================================================
+  {
+    id: "REC-WA-01",
+    category: "Workflow Automation",
+    name: "One-Click WhatsApp Udhar & Pending Balance Reminder",
+    explanation:
+      "Add a 'Send WhatsApp Reminder' button on `/admin/records` next to every customer with an unpaid balance (`amountPending > 0`). Clicking it opens a pre-composed WhatsApp Web message with customer name, service title, balance amount, and Airnet UPI payment details.",
+    whyNeeded:
+      "Administrators manually draft and copy-paste phone numbers and balance amounts to remind citizens of pending Udhar balances.",
+    benefits:
+      "Recovers outstanding payments up to 3x faster with zero manual typing. Respects customer privacy without third-party SMS gateway costs.",
+    improvement:
+      "Uses standard WhatsApp Web deep links `https://wa.me/91XXXXXXXXXX?text=Dear%20...` requiring zero monthly subscription fees.",
+    requirements:
+      "Frontend URI generator encoding customer balance details into official WhatsApp URL format.",
+    impact:
+      "No database or backend mutations. Works instantly within existing records ledger.",
+    priority: "High",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-WA-02",
+    category: "Workflow Automation",
+    name: "Automated Daily WhatsApp Executive Briefing",
+    explanation:
+      "Extend the existing 11:00 PM email reminder engine to optionally deliver a concise 5-line executive summary directly to the Admin's verified WhatsApp number (Requests Received, Tasks Completed, Cash Collected, Udhar Balance).",
+    whyNeeded:
+      "Administrators may not check their email inbox late at night, whereas WhatsApp notifications are viewed almost immediately.",
+    benefits:
+      "Keeps management informed of day-end cash balance and urgent tasks without opening an email client or laptop.",
+    improvement:
+      "Reuses existing `calculateDailyReportMetrics()` calculations to format a compact text summary payload.",
+    requirements:
+      "Integrate free CallMeBot / Green API / WhatsApp Cloud webhook into `daily-report-scheduler.ts`.",
+    impact:
+      "Runs alongside existing Gmail SMTP dispatch without affecting PDF generation.",
+    priority: "Medium",
+    complexity: "Moderate",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 6. SECURITY IMPROVEMENTS
+  // =========================================================================
+  {
+    id: "REC-SEC-01",
+    category: "Security Improvements",
+    name: "Public API Rate Limiting & DoS Protection",
+    explanation:
+      "Implement `express-rate-limit` middleware on public enquiry submission (`/api/enquiries`), mobile status lookup (`/api/enquiries/status`), and tracker search (`/api/tracker/lookup`). Restrict submissions to 10 requests per minute per IP.",
+    whyNeeded:
+      "Protects the server and database from malicious bot spam, automated form flooding, and brute-force mobile number enumeration.",
+    benefits:
+      "Guarantees high availability, prevents database connection pool exhaustion, and shields citizen data from automated scrapers.",
+    improvement:
+      "Safely intercepts abusive automated request spikes while allowing legitimate citizen lookups without friction.",
+    requirements:
+      "Install `express-rate-limit` in `api-server` and mount middleware on `/api/enquiries` and `/api/tracker` routes.",
+    impact:
+      "Normal users browsing the site will experience zero impact.",
+    priority: "Critical",
+    complexity: "Easy",
+    status: "pending",
+  },
+  {
+    id: "REC-SEC-02",
+    category: "Security Improvements",
+    name: "Administrative Action Audit Trail",
+    explanation:
+      "Create an internal audit log table `admin_audit_logs` tracking sensitive administrative events: status changes, record deletions, service updates, mobile number modifications, and login attempts.",
+    whyNeeded:
+      "Currently, if an enquiry or financial record is deleted or edited, there is no historical log identifying when or from which IP address the modification occurred.",
+    benefits:
+      "Ensures complete operational accountability, forensic auditability, and error traceability across multi-staff environments.",
+    improvement:
+      "Provides a dedicated 'Audit Logs' tab inside Admin Settings showing recent sensitive operations.",
+    requirements:
+      "Append-only database table `admin_audit_logs (id, adminUser, action, entity, entityId, timestamp, ipAddress)`.",
+    impact:
+      "Asynchronous background logging that does not slow down existing API mutations.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 7. DATABASE & BACKEND OPTIMIZATION
+  // =========================================================================
+  {
+    id: "REC-DB-01",
+    category: "Database & Backend Optimization",
+    name: "Non-Destructive Soft Deletes for Enquiries & Records",
+    explanation:
+      "Replace hard SQL `DELETE FROM enquiries` and `DELETE FROM records` with soft-deletion flags (`deleted_at TIMESTAMP NULL`). Admin UI displays a 'Trash / Recycle Bin' view allowing accidental deletions to be restored within 30 days.",
+    whyNeeded:
+      "Accidental clicks or counter mistakes currently purge records permanently from PostgreSQL, requiring a manual database backup restore to recover.",
+    benefits:
+      "Eliminates accidental business data loss. Preserves financial audit trails for annual tax accounting.",
+    improvement:
+      "Adds `isDeleted` filter to active views while adding a 'View Trash' toggle in Admin Records.",
+    requirements:
+      "Add `deleted_at: timestamp('deleted_at')` column in schema; update delete routes to set `deleted_at = new Date()`.",
+    impact:
+      "Fully backward-compatible. Queries simply filter `where(isNull(deleted_at))`.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+  {
+    id: "REC-DB-02",
+    category: "Database & Backend Optimization",
+    name: "Automated Nightly Backup to Cloud Object Storage",
+    explanation:
+      "Automate the existing `/api/admin/backup/full` snapshot generator to trigger nightly at 11:30 PM IST, encrypting the JSON snapshot and syncing it to a secondary off-site backup bucket (e.g. Google Cloud Storage or encrypted local archive).",
+    whyNeeded:
+      "Currently, backup generation requires the administrator to manually click 'Download Full Backup' from the Backup page.",
+    benefits:
+      "Guarantees zero data loss in the event of hardware failure, database corruption, or VM issues.",
+    improvement:
+      "Integrates automated snapshot archiving into the existing `daily-report-scheduler.ts` lifecycle.",
+    requirements:
+      "Node.js script writing snapshot JSON with date prefix `Airnet_Backup_YYYY-MM-DD.json` into an archive directory with 30-day retention pruning.",
+    impact:
+      "Leverages existing verified backup generator code without affecting live operations.",
+    priority: "Critical",
+    complexity: "Moderate",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 8. REPORTING & ANALYTICS
+  // =========================================================================
+  {
+    id: "REC-REP-01",
+    category: "Reporting & Analytics",
+    name: "Interactive Monthly Revenue & Profit Analytics Dashboard",
+    explanation:
+      "Add an interactive visual analytics tab on `/admin/reports` featuring interactive monthly revenue charts, service profitability breakdown (Revenue vs Vendor Cost), and citizen repeat-visit frequencies.",
+    whyNeeded:
+      "Currently, `/admin/reports` provides static tables and daily figures, but lacks visual graphical trends to understand which services generate the highest profit and seasonality.",
+    benefits:
+      "Provides actionable business intelligence. Helps the owner identify high-demand services, forecast revenue, and optimize pricing.",
+    improvement:
+      "Renders responsive SVG charts (Bar, Area, and Donut charts) using Recharts or lightweight SVG primitives.",
+    requirements:
+      "Backend endpoint `GET /api/admin/reports/analytics?range=30d` aggregating billing and payment ledger records by week/month.",
+    impact:
+      "Reads strictly from existing `recordsTable` and `applicationTasksTable`.",
+    priority: "High",
+    complexity: "Moderate",
+    status: "pending",
+  },
+  {
+    id: "REC-REP-02",
+    category: "Reporting & Analytics",
+    name: "One-Click Tally & Excel Financial Export",
+    explanation:
+      "Provide an 'Export for Accountant / Tally' button generating a structured Excel (`.xlsx`) or CSV file formatted with Date, Customer Name, Mobile, Service Category, Gross Amount, Cash/UPI Breakdown, and Pending Udhar.",
+    whyNeeded:
+      "Preparing monthly financial summaries for tax filing currently requires manual copying from the records screen.",
+    benefits:
+      "Saves hours of manual bookkeeping at month-end and eliminates accounting discrepancies.",
+    improvement:
+      "Adds direct Excel file download on `/admin/records` and `/admin/reports`.",
+    requirements:
+      "Lightweight CSV/Excel streaming handler on backend (`GET /api/admin/records/export-excel`).",
+    impact:
+      "Purely read-only database query.",
+    priority: "Medium",
+    complexity: "Easy",
+    status: "pending",
+  },
+
+  // =========================================================================
+  // 9. FUTURE DEVELOPMENT OPPORTUNITIES
+  // =========================================================================
+  {
+    id: "REC-FUT-01",
+    category: "Future Development Opportunities",
+    name: "Citizen Self-Service Counter Kiosk Mode",
+    explanation:
+      "Develop a full-screen, touch-optimized kiosk mode allowing citizens waiting at the shop counter to search for available government schemes, check required documents, and print or scan their tracking receipt on a tablet or touchscreen monitor.",
+    whyNeeded:
+      "During peak rush hours, up to 15 citizens crowd the counter asking basic questions about scheme eligibility and requirements.",
+    benefits:
+      "Relieves counter congestion, educates citizens on available government welfare schemes, and modernizes the shop's technological prestige.",
+    improvement:
+      "Dedicated touch-friendly interface with large buttons, high contrast, and simplified form inputs.",
+    requirements:
+      "Touch-optimized route `/kiosk` with idle auto-reset timers.",
+    impact:
+      "Independent frontend view with zero modifications to existing admin or customer pages.",
+    priority: "Low",
+    complexity: "Advanced",
+    status: "pending",
+  },
+  {
+    id: "REC-FUT-02",
+    category: "Future Development Opportunities",
+    name: "Barcoded Citizen Tracking Slips & Scanner Integration",
+    explanation:
+      "Generate standard Code-128 barcodes on printed citizen acknowledgement receipts. When a customer returns to collect their documents, scanning the receipt with a standard USB barcode scanner instantly pulls up their tracker task on the admin desk.",
+    whyNeeded:
+      "Counter staff currently type 10-digit mobile numbers or 7-character customer IDs manually for every returning citizen.",
+    benefits:
+      "Reduces customer document collection time from 30 seconds to under 2 seconds.",
+    improvement:
+      "Embeds barcode vector into receipts and adds auto-detect keyboard input handler for USB barcode scanners on the Admin Dashboard.",
+    requirements:
+      "SVG barcode generator (`jsbarcode`) and global scanner listener hook.",
+    impact:
+      "Seamless integration with existing `customerId` schema.",
+    priority: "Low",
+    complexity: "Moderate",
+    status: "pending",
+  },
+];

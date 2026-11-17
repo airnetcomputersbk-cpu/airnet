@@ -1,0 +1,297 @@
+{
+  "timestamp": "2026-11-07T12:52:09.081Z",
+  "database": {
+    "networkRTT": {
+      "samples": [
+        278.9,
+        279.1,
+        279.4,
+        280.4,
+        280.9
+      ],
+      "avgMs": 279.7,
+      "medianMs": 279.4,
+      "minMs": 278.9,
+      "maxMs": 280.9
+    },
+    "queries": [
+      {
+        "name": "SELECT FROM services",
+        "rowCount": 16,
+        "avgMs": 281.8,
+        "minMs": 280,
+        "maxMs": 284.8,
+        "queryPlan": "Sort  (cost=22.46..23.08 rows=250 width=293) |   Sort Key: order_index |   ->  Seq Scan on services  (cost=0.00..12.50 rows=250 width=293)"
+      },
+      {
+        "name": "SELECT FROM enquiries ORDER BY created_at DESC",
+        "rowCount": 17,
+        "avgMs": 283.6,
+        "minMs": 281.5,
+        "maxMs": 284.9,
+        "queryPlan": "Sort  (cost=22.46..23.08 rows=250 width=288) |   Sort Key: created_at DESC |   ->  Seq Scan on enquiries  (cost=0.00..12.50 rows=250 width=288)"
+      },
+      {
+        "name": "SELECT FROM application_tasks ORDER BY created_at DESC",
+        "rowCount": 6,
+        "avgMs": 285.7,
+        "minMs": 280.4,
+        "maxMs": 296,
+        "queryPlan": "Sort  (cost=18.00..18.42 rows=170 width=448) |   Sort Key: created_at DESC |   ->  Seq Scan on application_tasks  (cost=0.00..11.70 rows=170 width=448)"
+      },
+      {
+        "name": "SELECT FROM notifications WHERE status = 'Published'",
+        "rowCount": 7,
+        "avgMs": 283.4,
+        "minMs": 281.4,
+        "maxMs": 286.6,
+        "queryPlan": "Sort  (cost=12.01..12.02 rows=1 width=473) |   Sort Key: created_at DESC |   ->  Seq Scan on notifications  (cost=0.00..12.00 rows=1 width=473) |         Filter: (status = 'Published'::text)"
+      },
+      {
+        "name": "SELECT FROM records ORDER BY created_at DESC",
+        "rowCount": 1,
+        "avgMs": 284.6,
+        "minMs": 278.4,
+        "maxMs": 294.9,
+        "queryPlan": "Sort  (cost=27.10..27.93 rows=330 width=216) |   Sort Key: created_at DESC |   ->  Seq Scan on records  (cost=0.00..13.30 rows=330 width=216)"
+      },
+      {
+        "name": "LOOKUP application_tasks BY mobile_number (unindexed)",
+        "rowCount": 1,
+        "avgMs": 280.4,
+        "minMs": 279.2,
+        "maxMs": 281.1,
+        "queryPlan": "Seq Scan on application_tasks  (cost=0.00..12.12 rows=1 width=448) |   Filter: (mobile_number ~~ '%7892881086%'::text)"
+      },
+      {
+        "name": "LOOKUP enquiries BY customer_id (unindexed)",
+        "rowCount": 0,
+        "avgMs": 390.6,
+        "minMs": 280.8,
+        "maxMs": 563.6,
+        "queryPlan": "Seq Scan on enquiries  (cost=0.00..13.12 rows=1 width=288) |   Filter: (customer_id = 'AN-10001'::text)"
+      },
+      {
+        "name": "LOOKUP notifications BY is_featured (unindexed)",
+        "rowCount": 3,
+        "avgMs": 687,
+        "minMs": 427.3,
+        "maxMs": 936.2,
+        "queryPlan": "Seq Scan on notifications  (cost=0.00..11.60 rows=80 width=473) |   Filter: is_featured"
+      }
+    ],
+    "indexes": [
+      {
+        "tablename": "application_tasks",
+        "indexname": "application_tasks_pkey",
+        "indexdef": "CREATE UNIQUE INDEX application_tasks_pkey ON public.application_tasks USING btree (id)"
+      },
+      {
+        "tablename": "chat_conversations",
+        "indexname": "chat_conversations_pkey",
+        "indexdef": "CREATE UNIQUE INDEX chat_conversations_pkey ON public.chat_conversations USING btree (id)"
+      },
+      {
+        "tablename": "chat_messages",
+        "indexname": "chat_messages_pkey",
+        "indexdef": "CREATE UNIQUE INDEX chat_messages_pkey ON public.chat_messages USING btree (id)"
+      },
+      {
+        "tablename": "daily_report_logs",
+        "indexname": "daily_report_logs_pkey",
+        "indexdef": "CREATE UNIQUE INDEX daily_report_logs_pkey ON public.daily_report_logs USING btree (id)"
+      },
+      {
+        "tablename": "enquiries",
+        "indexname": "enquiries_pkey",
+        "indexdef": "CREATE UNIQUE INDEX enquiries_pkey ON public.enquiries USING btree (id)"
+      },
+      {
+        "tablename": "notifications",
+        "indexname": "notifications_pkey",
+        "indexdef": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)"
+      },
+      {
+        "tablename": "records",
+        "indexname": "records_pkey",
+        "indexdef": "CREATE UNIQUE INDEX records_pkey ON public.records USING btree (id)"
+      },
+      {
+        "tablename": "report_settings",
+        "indexname": "report_settings_pkey",
+        "indexdef": "CREATE UNIQUE INDEX report_settings_pkey ON public.report_settings USING btree (id)"
+      },
+      {
+        "tablename": "services",
+        "indexname": "services_pkey",
+        "indexdef": "CREATE UNIQUE INDEX services_pkey ON public.services USING btree (id)"
+      }
+    ],
+    "multiQueryPenalty": {
+      "sequentialMs": 1211,
+      "parallelMs": 1978.5,
+      "overheadMs": -767.4,
+      "percentageDifference": -63.4
+    }
+  },
+  "apis": [
+    {
+      "name": "Public Services List",
+      "path": "/api/services",
+      "statusCode": 200,
+      "payloadBytes": 6063,
+      "payloadKb": 5.92,
+      "avgMs": 557.7,
+      "medianMs": 286.3,
+      "p95Ms": 1641.1,
+      "p99Ms": 1641.1,
+      "minMs": 285.2,
+      "maxMs": 1641.1
+    },
+    {
+      "name": "Public Notifications List",
+      "path": "/api/notifications",
+      "statusCode": 200,
+      "payloadBytes": 7792,
+      "payloadKb": 7.61,
+      "avgMs": 295,
+      "medianMs": 281.6,
+      "p95Ms": 340.3,
+      "p99Ms": 340.3,
+      "minMs": 278.7,
+      "maxMs": 340.3
+    },
+    {
+      "name": "Public Business Info",
+      "path": "/api/business-info",
+      "statusCode": 200,
+      "payloadBytes": 374,
+      "payloadKb": 0.37,
+      "avgMs": 308,
+      "medianMs": 297.8,
+      "p95Ms": 361,
+      "p99Ms": 361,
+      "minMs": 275.2,
+      "maxMs": 361
+    },
+    {
+      "name": "Public Application Lookup",
+      "path": "/api/tracker/lookup?query=7892881086",
+      "statusCode": 400,
+      "payloadBytes": 33,
+      "payloadKb": 0.03,
+      "avgMs": 12.4,
+      "medianMs": 14.3,
+      "p95Ms": 18.8,
+      "p99Ms": 18.8,
+      "minMs": 4.8,
+      "maxMs": 18.8
+    },
+    {
+      "name": "Admin Enquiries (with Tasks + Services Join)",
+      "path": "/api/admin/enquiries",
+      "statusCode": 200,
+      "payloadBytes": 11998,
+      "payloadKb": 11.72,
+      "avgMs": 987.2,
+      "medianMs": 833.5,
+      "p95Ms": 1504.3,
+      "p99Ms": 1504.3,
+      "minMs": 791.1,
+      "maxMs": 1504.3
+    },
+    {
+      "name": "Admin Application Tracker List",
+      "path": "/api/admin/tracker",
+      "statusCode": 200,
+      "payloadBytes": 6636,
+      "payloadKb": 6.48,
+      "avgMs": 277.5,
+      "medianMs": 280.8,
+      "p95Ms": 291.6,
+      "p99Ms": 291.6,
+      "minMs": 264,
+      "maxMs": 291.6
+    },
+    {
+      "name": "Admin Ledger Records List",
+      "path": "/api/admin/records",
+      "statusCode": 200,
+      "payloadBytes": 280,
+      "payloadKb": 0.27,
+      "avgMs": 278,
+      "medianMs": 280.9,
+      "p95Ms": 293.2,
+      "p99Ms": 293.2,
+      "minMs": 263.6,
+      "maxMs": 293.2
+    },
+    {
+      "name": "Admin Notifications Management",
+      "path": "/api/admin/notifications",
+      "statusCode": 200,
+      "payloadBytes": 7792,
+      "payloadKb": 7.61,
+      "avgMs": 272.7,
+      "medianMs": 272.2,
+      "p95Ms": 284.6,
+      "p99Ms": 284.6,
+      "minMs": 266,
+      "maxMs": 284.6
+    },
+    {
+      "name": "Admin Daily Report Settings",
+      "path": "/api/admin/reports-daily/settings",
+      "statusCode": 200,
+      "payloadBytes": 1863,
+      "payloadKb": 1.82,
+      "avgMs": 808.5,
+      "medianMs": 803,
+      "p95Ms": 833.9,
+      "p99Ms": 833.9,
+      "minMs": 792.1,
+      "maxMs": 833.9
+    },
+    {
+      "name": "Admin AI Suggestions & Analysis",
+      "path": "/api/admin/ai-suggestions",
+      "statusCode": 200,
+      "payloadBytes": 22585,
+      "payloadKb": 22.06,
+      "avgMs": 51.9,
+      "medianMs": 15.7,
+      "p95Ms": 198.5,
+      "p99Ms": 198.5,
+      "minMs": 14.4,
+      "maxMs": 198.5
+    }
+  ],
+  "bundle": {
+    "assets": [
+      {
+        "file": "index-DEk4p6aa.js",
+        "sizeBytes": 1293726,
+        "sizeKb": 1263.4,
+        "sizeMb": 1.23
+      },
+      {
+        "file": "index-pDaUQilA.css",
+        "sizeBytes": 154144,
+        "sizeKb": 150.53,
+        "sizeMb": 0.15
+      },
+      {
+        "file": "LOGO_1787581255968-BCsddExs.png",
+        "sizeBytes": 323587,
+        "sizeKb": 316,
+        "sizeMb": 0.31
+      },
+      {
+        "file": "WhatsApp_Image_2026-08-27_at_10.54.13_AM_1787836315161-BzRotLYD.jpeg",
+        "sizeBytes": 154453,
+        "sizeKb": 150.83,
+        "sizeMb": 0.15
+      }
+    ]
+  }
+}

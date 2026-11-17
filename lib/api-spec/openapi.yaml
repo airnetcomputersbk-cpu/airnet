@@ -24,8 +24,134 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        "401":
+          description: Unauthorized
+  /admin/me:
+    get:
+      operationId: adminMe
+      tags: [admin]
+      summary: Get auth status
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      tags: [admin]
+      summary: Admin Logout
+      responses:
+        "200":
+          description: Logged out
+  /services:
+    get:
+      operationId: getServices
+      tags: [public]
+      summary: Get all services
+      responses:
+        "200":
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+  /admin/services:
+    post:
+      operationId: createService
+      tags: [admin]
+      summary: Create a new service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "200":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
 components:
   schemas:
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+        title:
+          type: string
+        copy:
+          type: string
+        price:
+          type: string
+        timing:
+          type: string
+        documents:
+          type: string
+        icon:
+          type: string
+        accent:
+          type: string
+      required: [id, category, title, copy, price, timing, documents]
+    CreateServiceRequest:
+      type: object
+      properties:
+        category:
+          type: string
+        title:
+          type: string
+        copy:
+          type: string
+        price:
+          type: string
+        timing:
+          type: string
+        documents:
+          type: string
+        icon:
+          type: string
+        accent:
+          type: string
+      required: [category, title, copy, price, timing, documents]
+    AdminLoginRequest:
+      type: object
+      properties:
+        password:
+          type: string
+      required: [password]
     HealthStatus:
       type: object
       properties:
