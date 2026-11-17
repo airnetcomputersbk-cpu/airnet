@@ -3,11 +3,14 @@
   "services": {
     "airnet-computers": {
       "root": "artifacts/airnet-computers",
-      "framework": "vite"
+      "framework": "vite",
+      "outputDirectory": "dist"
     },
     "api-server": {
       "root": "artifacts/api-server",
       "framework": "express",
+      "entrypoint": "dist/index.mjs",
+      "buildCommand": "node ./build.mjs",
       "bindings": [
         {
           "type": "service",
