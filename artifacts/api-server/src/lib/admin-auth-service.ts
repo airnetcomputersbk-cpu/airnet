@@ -36,7 +36,7 @@ export async function getAdminMasterPassword(): Promise<string> {
     logger.error({ err }, "[admin-auth] Error loading password from database");
   }
 
-  cachedPassword = (process.env.ADMIN_MASTER_PASSWORD || "admin").trim();
+  cachedPassword = (process.env.ADMIN_MASTER_PASSWORD || "airnet").trim();
   return cachedPassword;
 }
 

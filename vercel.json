@@ -9,7 +9,7 @@
     "api-server": {
       "root": "artifacts/api-server",
       "framework": "express",
-      "entrypoint": "dist/index.mjs",
+      "entrypoint": "dist/serverless.mjs",
       "buildCommand": "node ./build.mjs",
       "bindings": [
         {

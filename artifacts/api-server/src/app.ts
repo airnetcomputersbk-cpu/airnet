@@ -54,6 +54,14 @@ app.use(
   }),
 );
 
+// URL normalization middleware for reverse proxies and Vercel Services
+app.use((req, res, next) => {
+  if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/uploads")) {
+    req.url = `/api${req.url.startsWith("/") ? "" : "/"}${req.url}`;
+  }
+  next();
+});
+
 app.use("/api", router);
 app.use("/api/pathway", pathwayEmbedRouter);
 app.use("/api/admin", adminRouter);
