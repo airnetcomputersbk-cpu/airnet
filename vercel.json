@@ -5,7 +5,15 @@
   "outputDirectory": "public",
   "rewrites": [
     {
-      "source": "/((?!api/|uploads/).*)",
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
