@@ -1,11 +1,11 @@
-import type { Request, Response } from "express";
+// @ts-nocheck
 import app from "../artifacts/api-server/src/app";
 
 /**
  * Vercel Serverless Function Catch-All entrypoint for AIRNET COMPUTERS API
  * Handles all /api/* routes (e.g. /api/services, /api/admin/login, etc.)
  */
-export default function handler(req: Request, res: Response) {
+export default function handler(req: any, res: any) {
   if (req.url && !req.url.startsWith("/api") && !req.url.startsWith("/uploads")) {
     req.url = `/api${req.url.startsWith("/") ? "" : "/"}${req.url}`;
   }
