@@ -14,22 +14,14 @@ async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  await esbuild({
-    entryPoints: [
-      path.resolve(artifactDir, "src/index.ts"),
-      path.resolve(artifactDir, "src/serverless.ts")
-    ],
+  const rootDir = path.resolve(artifactDir, "../..");
+  const apiDir = path.resolve(rootDir, "api");
+
+  const commonOptions = {
     platform: "node",
     bundle: true,
     format: "esm",
-    outdir: distDir,
-    outExtension: { ".js": ".mjs" },
     logLevel: "info",
-    // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
-    // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
-    // Examples of unbundleable packages:
-    // - uses native modules and loads them dynamically (e.g. sharp)
-    // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
       "tesseract.js",
@@ -108,10 +100,8 @@ async function buildAll() {
     ],
     sourcemap: "linked",
     plugins: [
-      // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
       esbuildPluginPino({ transports: ["pino-pretty"] })
     ],
-    // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {
       js: `import { createRequire as __bannerCrReq } from 'node:module';
 import __bannerPath from 'node:path';
@@ -122,6 +112,28 @@ globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
+  };
+
+  await esbuild({
+    ...commonOptions,
+    entryPoints: [
+      path.resolve(artifactDir, "src/index.ts"),
+      path.resolve(artifactDir, "src/serverless.ts")
+    ],
+    outdir: distDir,
+    outExtension: { ".js": ".mjs" },
+  });
+
+  // Copy serverless.mjs to root of api-server so it is tracked by Git (not ignored by dist/)
+  const fs = await import("node:fs");
+  fs.copyFileSync(path.resolve(distDir, "serverless.mjs"), path.resolve(artifactDir, "serverless.js"));
+
+  // Also bundle self-contained Serverless Function into api/serverless-handler.js for Vercel
+  await esbuild({
+    ...commonOptions,
+    entryPoints: [path.resolve(artifactDir, "src/serverless-handler.ts")],
+    outdir: apiDir,
+    outExtension: { ".js": ".js" },
   });
 }
 
