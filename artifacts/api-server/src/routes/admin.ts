@@ -85,67 +85,89 @@ adminRouter.post("/forgot-password/verify-reset", async (req, res) => {
   }
 });
 
+// Helper to determine the exact origin of incoming requests safely (protects against dummy env values like 'your-app-name')
+export function getSafeRequestOrigin(req: express.Request): string {
+  const customOrigin = (req.query?.origin as string) || "";
+  if (customOrigin && !customOrigin.includes("your-app-name") && !customOrigin.includes("undefined")) {
+    return customOrigin.replace(/\/$/, "");
+  }
+
+  if (req.headers.referer) {
+    try {
+      const ref = new URL(req.headers.referer as string);
+      if (!ref.origin.includes("your-app-name")) {
+        return ref.origin.replace(/\/$/, "");
+      }
+    } catch {}
+  }
+
+  const forwardedHost = req.headers["x-forwarded-host"] as string;
+  const host = forwardedHost || req.get("host") || "airnet-tp3z.vercel.app";
+  const isLocal = host.includes("localhost");
+  const forwardedProto = req.headers["x-forwarded-proto"] as string;
+  const proto = isLocal ? "http" : (forwardedProto || "https");
+
+  const envUrl = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL;
+  if (envUrl && !envUrl.includes("your-app-name") && !envUrl.includes("undefined")) {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  return `${proto}://${host}`;
+}
+
 // Public OAuth Callback redirect from Google (must be before authMiddleware so external redirect succeeds)
 adminRouter.get("/gmail/callback", async (req, res) => {
-  const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "localhost:5000";
-  const proto = (req.headers["x-forwarded-proto"] as string) || (req.secure ? "https" : "http");
-  const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-  const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
+  const origin = getSafeRequestOrigin(req);
   try {
     const code = req.query.code as string;
     const error = req.query.error as string;
 
     if (error) {
       console.error("[admin] Google OAuth error in callback:", error);
-      res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=${encodeURIComponent(error)}`);
+      res.redirect(`${origin}/admin/daily-reports?gmail_error=${encodeURIComponent(error)}`);
       return;
     }
 
     if (!code) {
-      res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=No_authorization_code_received`);
+      res.redirect(`${origin}/admin/daily-reports?gmail_error=No_authorization_code_received`);
       return;
     }
 
     const { handleOAuthCallback } = await import("../lib/gmail-oauth-service");
-    const origin = `${req.protocol}://${req.get("host")}`;
     const result = await handleOAuthCallback(code, origin);
 
-    res.redirect(`${frontendBase}/admin/daily-reports?gmail_connected=true&email=${encodeURIComponent(result.email)}`);
+    res.redirect(`${origin}/admin/daily-reports?gmail_connected=true&email=${encodeURIComponent(result.email)}`);
   } catch (err: any) {
     console.error("[admin] Error handling Gmail OAuth callback:", err);
-    res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=${encodeURIComponent(err.message || "Failed to authorize account")}`);
+    res.redirect(`${origin}/admin/daily-reports?gmail_error=${encodeURIComponent(err.message || "Failed to authorize account")}`);
   }
 });
 
 // Public Google Drive OAuth Callback redirect from Google
 adminRouter.get("/google-drive/callback", async (req, res) => {
-  const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "localhost:5000";
-  const proto = (req.headers["x-forwarded-proto"] as string) || (req.secure ? "https" : "http");
-  const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-  const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
+  const origin = getSafeRequestOrigin(req);
   try {
     const code = req.query.code as string;
     const error = req.query.error as string;
 
     if (error) {
       console.error("[admin] Google Drive OAuth error in callback:", error);
-      res.redirect(`${frontendBase}/admin/documents?drive_error=${encodeURIComponent(error)}`);
+      res.redirect(`${origin}/admin/documents?drive_error=${encodeURIComponent(error)}`);
       return;
     }
 
     if (!code) {
-      res.redirect(`${frontendBase}/admin/documents?drive_error=No_authorization_code_received`);
+      res.redirect(`${origin}/admin/documents?drive_error=No_authorization_code_received`);
       return;
     }
 
     const { handleDriveOAuthCallback } = await import("../lib/google-drive-service");
-    const origin = `${req.protocol}://${req.get("host")}`;
     const result = await handleDriveOAuthCallback(code, origin);
 
-    res.redirect(`${frontendBase}/admin/documents?drive_connected=true&email=${encodeURIComponent(result.email)}`);
+    res.redirect(`${origin}/admin/documents?drive_connected=true&email=${encodeURIComponent(result.email)}`);
   } catch (err: any) {
     console.error("[admin] Error handling Google Drive OAuth callback:", err);
-    res.redirect(`${frontendBase}/admin/documents?drive_error=${encodeURIComponent(err.message || "Failed to authorize Google Drive")}`);
+    res.redirect(`${origin}/admin/documents?drive_error=${encodeURIComponent(err.message || "Failed to authorize Google Drive")}`);
   }
 });
 
@@ -1985,7 +2007,7 @@ adminRouter.post("/gmail/config", async (req, res) => {
 adminRouter.get("/gmail/auth-url", async (req, res) => {
   try {
     const { generateGoogleAuthUrl } = await import("../lib/gmail-oauth-service");
-    const origin = `${req.protocol}://${req.get("host")}`;
+    const origin = getSafeRequestOrigin(req);
     const result = await generateGoogleAuthUrl(origin);
     res.json(result);
   } catch (error: any) {
@@ -2248,14 +2270,7 @@ adminRouter.get("/google-drive/status", async (req, res) => {
 adminRouter.get("/google-drive/auth", async (req, res) => {
   try {
     const { generateDriveAuthUrl } = await import("../lib/google-drive-service");
-    let customOrigin = req.query.origin as string;
-    if (!customOrigin && req.headers.referer) {
-      try {
-        const refUrl = new URL(req.headers.referer as string);
-        customOrigin = refUrl.origin;
-      } catch {}
-    }
-    const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || "http://localhost:5000";
+    const origin = getSafeRequestOrigin(req);
     const result = await generateDriveAuthUrl(origin);
     res.json(result);
   } catch (err: any) {

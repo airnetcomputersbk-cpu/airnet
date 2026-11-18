@@ -78,10 +78,16 @@ export async function getStoredGmailCredentials() {
  * Determine the exact OAuth redirect URI
  */
 export function getRedirectUri(customOrigin?: string): string {
-  if (process.env.GMAIL_REDIRECT_URI) {
+  if (process.env.GMAIL_REDIRECT_URI && !process.env.GMAIL_REDIRECT_URI.includes("your-app-name")) {
     return process.env.GMAIL_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5001";
+  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
+  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+    origin = "https://airnet-tp3z.vercel.app";
+  }
+  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
+    origin = origin.replace(/^http:\/\//, "https://");
+  }
   return `${origin.replace(/\/$/, "")}/api/admin/gmail/callback`;
 }
 

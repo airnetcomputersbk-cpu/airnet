@@ -224,10 +224,16 @@ export async function updateDriveClientCredentials(clientId: string, clientSecre
  * Determine OAuth redirect URI for Google Drive
  */
 export function getDriveRedirectUri(customOrigin?: string): string {
-  if (process.env.GOOGLE_DRIVE_REDIRECT_URI) {
+  if (process.env.GOOGLE_DRIVE_REDIRECT_URI && !process.env.GOOGLE_DRIVE_REDIRECT_URI.includes("your-app-name")) {
     return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5000";
+  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
+  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+    origin = "https://airnet-tp3z.vercel.app";
+  }
+  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
+    origin = origin.replace(/^http:\/\//, "https://");
+  }
   return `${origin.replace(/\/$/, "")}/api/admin/google-drive/callback`;
 }
 

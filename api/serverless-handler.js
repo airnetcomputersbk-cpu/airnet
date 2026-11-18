@@ -55896,10 +55896,16 @@ async function getStoredGmailCredentials() {
   };
 }
 function getRedirectUri(customOrigin) {
-  if (process.env.GMAIL_REDIRECT_URI) {
+  if (process.env.GMAIL_REDIRECT_URI && !process.env.GMAIL_REDIRECT_URI.includes("your-app-name")) {
     return process.env.GMAIL_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5001";
+  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
+  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+    origin = "https://airnet-tp3z.vercel.app";
+  }
+  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
+    origin = origin.replace(/^http:\/\//, "https://");
+  }
   return `${origin.replace(/\/$/, "")}/api/admin/gmail/callback`;
 }
 async function generateGoogleAuthUrl(origin) {
@@ -58034,10 +58040,16 @@ async function updateDriveClientCredentials(clientId, clientSecret) {
   }).where(eq(googleDriveSettingsTable.id, "drive_config"));
 }
 function getDriveRedirectUri(customOrigin) {
-  if (process.env.GOOGLE_DRIVE_REDIRECT_URI) {
+  if (process.env.GOOGLE_DRIVE_REDIRECT_URI && !process.env.GOOGLE_DRIVE_REDIRECT_URI.includes("your-app-name")) {
     return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
   }
-  const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "http://localhost:5000";
+  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
+  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+    origin = "https://airnet-tp3z.vercel.app";
+  }
+  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
+    origin = origin.replace(/^http:\/\//, "https://");
+  }
   return `${origin.replace(/\/$/, "")}/api/admin/google-drive/callback`;
 }
 async function generateDriveAuthUrl(origin) {
@@ -59001,10 +59013,36 @@ var admin_exports = {};
 __export(admin_exports, {
   adminRouter: () => adminRouter,
   getPathwayCustomerDetails: () => getPathwayCustomerDetails,
-  getPathwayCustomersList: () => getPathwayCustomersList
+  getPathwayCustomersList: () => getPathwayCustomersList,
+  getSafeRequestOrigin: () => getSafeRequestOrigin
 });
 import fs5 from "fs";
 import path5 from "path";
+function getSafeRequestOrigin(req2) {
+  const customOrigin = req2.query?.origin || "";
+  if (customOrigin && !customOrigin.includes("your-app-name") && !customOrigin.includes("undefined")) {
+    return customOrigin.replace(/\/$/, "");
+  }
+  if (req2.headers.referer) {
+    try {
+      const ref = new URL(req2.headers.referer);
+      if (!ref.origin.includes("your-app-name")) {
+        return ref.origin.replace(/\/$/, "");
+      }
+    } catch {
+    }
+  }
+  const forwardedHost = req2.headers["x-forwarded-host"];
+  const host = forwardedHost || req2.get("host") || "airnet-tp3z.vercel.app";
+  const isLocal = host.includes("localhost");
+  const forwardedProto = req2.headers["x-forwarded-proto"];
+  const proto = isLocal ? "http" : forwardedProto || "https";
+  const envUrl = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL;
+  if (envUrl && !envUrl.includes("your-app-name") && !envUrl.includes("undefined")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  return `${proto}://${host}`;
+}
 async function getPathwayCustomersList() {
   const [tasks, enquiries, records, documents] = await Promise.all([
     db.select().from(applicationTasksTable).orderBy(desc(applicationTasksTable.updatedAt)),
@@ -59307,55 +59345,47 @@ var init_admin = __esm({
       }
     });
     adminRouter.get("/gmail/callback", async (req2, res) => {
-      const host = req2.headers["x-forwarded-host"] || req2.get("host") || "localhost:5000";
-      const proto = req2.headers["x-forwarded-proto"] || (req2.secure ? "https" : "http");
-      const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-      const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
+      const origin = getSafeRequestOrigin(req2);
       try {
         const code = req2.query.code;
         const error40 = req2.query.error;
         if (error40) {
           console.error("[admin] Google OAuth error in callback:", error40);
-          res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=${encodeURIComponent(error40)}`);
+          res.redirect(`${origin}/admin/daily-reports?gmail_error=${encodeURIComponent(error40)}`);
           return;
         }
         if (!code) {
-          res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=No_authorization_code_received`);
+          res.redirect(`${origin}/admin/daily-reports?gmail_error=No_authorization_code_received`);
           return;
         }
         const { handleOAuthCallback: handleOAuthCallback2 } = await Promise.resolve().then(() => (init_gmail_oauth_service(), gmail_oauth_service_exports));
-        const origin = `${req2.protocol}://${req2.get("host")}`;
         const result = await handleOAuthCallback2(code, origin);
-        res.redirect(`${frontendBase}/admin/daily-reports?gmail_connected=true&email=${encodeURIComponent(result.email)}`);
+        res.redirect(`${origin}/admin/daily-reports?gmail_connected=true&email=${encodeURIComponent(result.email)}`);
       } catch (err) {
         console.error("[admin] Error handling Gmail OAuth callback:", err);
-        res.redirect(`${frontendBase}/admin/daily-reports?gmail_error=${encodeURIComponent(err.message || "Failed to authorize account")}`);
+        res.redirect(`${origin}/admin/daily-reports?gmail_error=${encodeURIComponent(err.message || "Failed to authorize account")}`);
       }
     });
     adminRouter.get("/google-drive/callback", async (req2, res) => {
-      const host = req2.headers["x-forwarded-host"] || req2.get("host") || "localhost:5000";
-      const proto = req2.headers["x-forwarded-proto"] || (req2.secure ? "https" : "http");
-      const fallbackOrigin = host.includes("localhost") ? "http://localhost:5000" : `${proto}://${host}`;
-      const frontendBase = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || fallbackOrigin;
+      const origin = getSafeRequestOrigin(req2);
       try {
         const code = req2.query.code;
         const error40 = req2.query.error;
         if (error40) {
           console.error("[admin] Google Drive OAuth error in callback:", error40);
-          res.redirect(`${frontendBase}/admin/documents?drive_error=${encodeURIComponent(error40)}`);
+          res.redirect(`${origin}/admin/documents?drive_error=${encodeURIComponent(error40)}`);
           return;
         }
         if (!code) {
-          res.redirect(`${frontendBase}/admin/documents?drive_error=No_authorization_code_received`);
+          res.redirect(`${origin}/admin/documents?drive_error=No_authorization_code_received`);
           return;
         }
         const { handleDriveOAuthCallback: handleDriveOAuthCallback2 } = await Promise.resolve().then(() => (init_google_drive_service(), google_drive_service_exports));
-        const origin = `${req2.protocol}://${req2.get("host")}`;
         const result = await handleDriveOAuthCallback2(code, origin);
-        res.redirect(`${frontendBase}/admin/documents?drive_connected=true&email=${encodeURIComponent(result.email)}`);
+        res.redirect(`${origin}/admin/documents?drive_connected=true&email=${encodeURIComponent(result.email)}`);
       } catch (err) {
         console.error("[admin] Error handling Google Drive OAuth callback:", err);
-        res.redirect(`${frontendBase}/admin/documents?drive_error=${encodeURIComponent(err.message || "Failed to authorize Google Drive")}`);
+        res.redirect(`${origin}/admin/documents?drive_error=${encodeURIComponent(err.message || "Failed to authorize Google Drive")}`);
       }
     });
     adminRouter.get("/pathway/customers", async (req2, res) => {
@@ -60650,7 +60680,7 @@ ${finalNotes}`;
     adminRouter.get("/gmail/auth-url", async (req2, res) => {
       try {
         const { generateGoogleAuthUrl: generateGoogleAuthUrl2 } = await Promise.resolve().then(() => (init_gmail_oauth_service(), gmail_oauth_service_exports));
-        const origin = `${req2.protocol}://${req2.get("host")}`;
+        const origin = getSafeRequestOrigin(req2);
         const result = await generateGoogleAuthUrl2(origin);
         res.json(result);
       } catch (error40) {
@@ -60861,15 +60891,7 @@ ${finalNotes}`;
     adminRouter.get("/google-drive/auth", async (req2, res) => {
       try {
         const { generateDriveAuthUrl: generateDriveAuthUrl2 } = await Promise.resolve().then(() => (init_google_drive_service(), google_drive_service_exports));
-        let customOrigin = req2.query.origin;
-        if (!customOrigin && req2.headers.referer) {
-          try {
-            const refUrl = new URL(req2.headers.referer);
-            customOrigin = refUrl.origin;
-          } catch {
-          }
-        }
-        const origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL || "http://localhost:5000";
+        const origin = getSafeRequestOrigin(req2);
         const result = await generateDriveAuthUrl2(origin);
         res.json(result);
       } catch (err) {
@@ -66938,6 +66960,7 @@ init_events();
 init_src();
 init_drizzle_orm();
 var app = (0, import_express6.default)();
+app.set("trust proxy", true);
 app.use(nativeCompression);
 var uploadsDir = process.env.VERCEL ? path6.resolve("/tmp", "uploads") : path6.resolve(process.cwd(), "artifacts/api-server/uploads");
 try {

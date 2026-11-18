@@ -329,7 +329,8 @@ export default function DailyReports() {
     setIsConnectingGmail(true);
     setActionFeedback(null);
     try {
-      const res = await fetch("/api/admin/gmail/auth-url");
+      const originParam = typeof window !== "undefined" ? window.location.origin : "http://localhost:5000";
+      const res = await fetch(`/api/admin/gmail/auth-url?origin=${encodeURIComponent(originParam)}`);
       const data = await res.json();
 
       if (!res.ok || !data.hasCredentials) {

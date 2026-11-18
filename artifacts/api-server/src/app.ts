@@ -17,6 +17,8 @@ import { eq, asc } from "drizzle-orm";
 
 const app = express();
 
+app.set("trust proxy", true);
+
 app.use(nativeCompression);
 
 const uploadsDir = process.env.VERCEL
