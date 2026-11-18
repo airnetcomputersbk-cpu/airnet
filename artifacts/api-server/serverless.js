@@ -55931,7 +55931,8 @@ async function generateGoogleAuthUrl(origin) {
   authUrl.searchParams.set("state", state);
   return {
     url: authUrl.toString(),
-    redirectUri
+    redirectUri,
+    hasCredentials: true
   };
 }
 async function handleOAuthCallback(code, origin) {
@@ -58075,7 +58076,8 @@ async function generateDriveAuthUrl(origin) {
   authUrl.searchParams.set("state", state);
   return {
     url: authUrl.toString(),
-    redirectUri
+    redirectUri,
+    hasCredentials: true
   };
 }
 async function handleDriveOAuthCallback(code, origin) {

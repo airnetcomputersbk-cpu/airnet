@@ -95,7 +95,7 @@ export function getRedirectUri(customOrigin?: string): string {
  * Generate Google OAuth 2.0 Consent URL
  * Scopes: gmail.send (send emails) & userinfo.email (display authorized email)
  */
-export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: string; redirectUri: string }> {
+export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: string; redirectUri: string; hasCredentials: boolean }> {
   const creds = await getStoredGmailCredentials();
 
   if (!creds.clientId || !creds.clientSecret) {
@@ -124,6 +124,7 @@ export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: str
   return {
     url: authUrl.toString(),
     redirectUri,
+    hasCredentials: true,
   };
 }
 

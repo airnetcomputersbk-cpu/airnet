@@ -240,7 +240,7 @@ export function getDriveRedirectUri(customOrigin?: string): string {
 /**
  * Generate Google OAuth 2.0 Auth URL for Google Drive
  */
-export async function generateDriveAuthUrl(origin?: string): Promise<{ url: string; redirectUri: string }> {
+export async function generateDriveAuthUrl(origin?: string): Promise<{ url: string; redirectUri: string; hasCredentials: boolean }> {
   const creds = await getStoredDriveCredentials();
 
   if (!creds.clientId || !creds.clientSecret) {
@@ -270,6 +270,7 @@ export async function generateDriveAuthUrl(origin?: string): Promise<{ url: stri
   return {
     url: authUrl.toString(),
     redirectUri,
+    hasCredentials: true,
   };
 }
 

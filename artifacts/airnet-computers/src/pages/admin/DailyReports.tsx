@@ -168,9 +168,11 @@ export default function DailyReports() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Gmail API OAuth Modal & Action states
+  const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_GMAIL_CLIENT_SECRET = "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";
   const [showGmailModal, setShowGmailModal] = useState(false);
-  const [gmailClientIdInput, setGmailClientIdInput] = useState("");
-  const [gmailClientSecretInput, setGmailClientSecretInput] = useState("");
+  const [gmailClientIdInput, setGmailClientIdInput] = useState(DEFAULT_GMAIL_CLIENT_ID);
+  const [gmailClientSecretInput, setGmailClientSecretInput] = useState(DEFAULT_GMAIL_CLIENT_SECRET);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [savingGmailCreds, setSavingGmailCreds] = useState(false);
   const [isConnectingGmail, setIsConnectingGmail] = useState(false);
@@ -252,6 +254,13 @@ export default function DailyReports() {
         if (data.smtp?.port) setSmtpPortInput(data.smtp.port);
         if (data.smtp?.senderEmail) setSmtpUserInput(data.smtp.senderEmail);
         if (data.smtp?.fromName) setSmtpFromNameInput(data.smtp.fromName);
+
+        if (data.settings?.gmailClientId) {
+          setGmailClientIdInput(data.settings.gmailClientId);
+        } else {
+          setGmailClientIdInput(DEFAULT_GMAIL_CLIENT_ID);
+        }
+        setGmailClientSecretInput(DEFAULT_GMAIL_CLIENT_SECRET);
       }
     } catch (err) {
       console.error("Error fetching report settings:", err);
@@ -319,13 +328,6 @@ export default function DailyReports() {
 
   // Connect or Reconnect Gmail Account via Google OAuth 2.0
   const handleConnectGmail = async () => {
-    // If credentials are not configured yet, open modal without a scary error
-    if (!gmail?.configured) {
-      setGmailModalError(null);
-      setShowGmailModal(true);
-      return;
-    }
-
     setIsConnectingGmail(true);
     setActionFeedback(null);
     try {
@@ -333,7 +335,7 @@ export default function DailyReports() {
       const res = await fetch(`/api/admin/gmail/auth-url?origin=${encodeURIComponent(originParam)}`);
       const data = await res.json();
 
-      if (!res.ok || !data.hasCredentials) {
+      if (!res.ok || !data.url) {
         setShowGmailModal(true);
         setGmailModalError(data.error || "Please configure your Google Cloud OAuth Client ID & Secret first.");
         return;
