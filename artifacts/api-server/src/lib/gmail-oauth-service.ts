@@ -82,7 +82,7 @@ export function getRedirectUri(customOrigin?: string): string {
     return process.env.GMAIL_REDIRECT_URI.trim();
   }
   let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
-  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+  if (origin.includes("your-app-name") || origin.includes("google.com") || origin.includes("undefined")) {
     origin = "https://airnet-tp3z.vercel.app";
   }
   if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {

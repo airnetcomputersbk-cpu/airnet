@@ -85,22 +85,19 @@ adminRouter.post("/forgot-password/verify-reset", async (req, res) => {
   }
 });
 
-// Helper to determine the exact origin of incoming requests safely (protects against dummy env values like 'your-app-name')
+// Helper to determine the exact origin of incoming requests safely (protects against dummy env values and external referers like Google)
 export function getSafeRequestOrigin(req: express.Request): string {
   const customOrigin = (req.query?.origin as string) || "";
-  if (customOrigin && !customOrigin.includes("your-app-name") && !customOrigin.includes("undefined")) {
+  if (
+    customOrigin &&
+    !customOrigin.includes("your-app-name") &&
+    !customOrigin.includes("google.com") &&
+    !customOrigin.includes("undefined")
+  ) {
     return customOrigin.replace(/\/$/, "");
   }
 
-  if (req.headers.referer) {
-    try {
-      const ref = new URL(req.headers.referer as string);
-      if (!ref.origin.includes("your-app-name")) {
-        return ref.origin.replace(/\/$/, "");
-      }
-    } catch {}
-  }
-
+  // Derive from incoming request headers on Vercel / reverse proxy (never use external referers like accounts.google.com)
   const forwardedHost = req.headers["x-forwarded-host"] as string;
   const host = forwardedHost || req.get("host") || "airnet-tp3z.vercel.app";
   const isLocal = host.includes("localhost");
@@ -108,7 +105,12 @@ export function getSafeRequestOrigin(req: express.Request): string {
   const proto = isLocal ? "http" : (forwardedProto || "https");
 
   const envUrl = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL;
-  if (envUrl && !envUrl.includes("your-app-name") && !envUrl.includes("undefined")) {
+  if (
+    envUrl &&
+    !envUrl.includes("your-app-name") &&
+    !envUrl.includes("google.com") &&
+    !envUrl.includes("undefined")
+  ) {
     return envUrl.replace(/\/$/, "");
   }
 

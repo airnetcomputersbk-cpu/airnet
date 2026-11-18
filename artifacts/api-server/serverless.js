@@ -55900,7 +55900,7 @@ function getRedirectUri(customOrigin) {
     return process.env.GMAIL_REDIRECT_URI.trim();
   }
   let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
-  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+  if (origin.includes("your-app-name") || origin.includes("google.com") || origin.includes("undefined")) {
     origin = "https://airnet-tp3z.vercel.app";
   }
   if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
@@ -58045,7 +58045,7 @@ function getDriveRedirectUri(customOrigin) {
     return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
   }
   let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
-  if (origin.includes("your-app-name") || origin.includes("undefined")) {
+  if (origin.includes("your-app-name") || origin.includes("google.com") || origin.includes("undefined")) {
     origin = "https://airnet-tp3z.vercel.app";
   }
   if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
@@ -59022,17 +59022,8 @@ import fs5 from "fs";
 import path5 from "path";
 function getSafeRequestOrigin(req2) {
   const customOrigin = req2.query?.origin || "";
-  if (customOrigin && !customOrigin.includes("your-app-name") && !customOrigin.includes("undefined")) {
+  if (customOrigin && !customOrigin.includes("your-app-name") && !customOrigin.includes("google.com") && !customOrigin.includes("undefined")) {
     return customOrigin.replace(/\/$/, "");
-  }
-  if (req2.headers.referer) {
-    try {
-      const ref = new URL(req2.headers.referer);
-      if (!ref.origin.includes("your-app-name")) {
-        return ref.origin.replace(/\/$/, "");
-      }
-    } catch {
-    }
   }
   const forwardedHost = req2.headers["x-forwarded-host"];
   const host = forwardedHost || req2.get("host") || "airnet-tp3z.vercel.app";
@@ -59040,7 +59031,7 @@ function getSafeRequestOrigin(req2) {
   const forwardedProto = req2.headers["x-forwarded-proto"];
   const proto = isLocal ? "http" : forwardedProto || "https";
   const envUrl = process.env.AIRNET_COMPUTERS_URL || process.env.FRONTEND_URL;
-  if (envUrl && !envUrl.includes("your-app-name") && !envUrl.includes("undefined")) {
+  if (envUrl && !envUrl.includes("your-app-name") && !envUrl.includes("google.com") && !envUrl.includes("undefined")) {
     return envUrl.replace(/\/$/, "");
   }
   return `${proto}://${host}`;
