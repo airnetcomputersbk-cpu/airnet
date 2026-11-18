@@ -1846,6 +1846,30 @@ export default function Documents() {
                 </div>
               </div>
 
+              {/* Authorized Redirect URI Notice */}
+              <div className="bg-amber-50/80 border border-amber-200 p-3 rounded-xl text-[11px] text-amber-900 space-y-1.5">
+                <div className="font-bold flex items-center justify-between">
+                  <span>Google Cloud Authorized Redirect URI:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const redirectUrl = `${window.location.origin}/api/admin/google-drive/callback`;
+                      navigator.clipboard.writeText(redirectUrl);
+                      showSuccess("Copied!", "Redirect URI copied to clipboard. Paste this into Google Cloud Console.");
+                    }}
+                    className="text-blue-700 hover:text-blue-900 font-semibold underline text-[10px] cursor-pointer"
+                  >
+                    Copy Redirect URI
+                  </button>
+                </div>
+                <code className="block bg-white p-2 rounded-lg border border-amber-200 font-mono text-[10px] text-slate-800 break-all select-all">
+                  {typeof window !== "undefined" ? `${window.location.origin}/api/admin/google-drive/callback` : "http://localhost:5000/api/admin/google-drive/callback"}
+                </code>
+                <div className="text-[10px] text-amber-800 leading-normal">
+                  In <strong>Google Cloud Console &gt; Credentials &gt; OAuth 2.0 Client IDs</strong>, ensure this exact URL is added under <strong>Authorized redirect URIs</strong>.
+                </div>
+              </div>
+
               {/* Client Credentials Form */}
               <form onSubmit={handleSaveCredentials} className="space-y-3 pt-2 border-t border-slate-100">
                 <div className="text-xs font-bold text-slate-800">
