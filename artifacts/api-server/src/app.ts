@@ -62,6 +62,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// Dual-mount router to handle both /api/* and rewritten paths
 app.use("/api", router);
 app.use("/api/pathway", pathwayEmbedRouter);
 app.use("/api/admin", adminRouter);
@@ -81,10 +82,21 @@ app.patch("/api/services/reorder", (req, res, next) => {
   governmentServicesRouter(req, res, next);
 });
 
+// Fallback mounts if /api prefix is stripped by reverse proxy
+app.use("/admin", adminRouter);
+app.use("/pathway", pathwayEmbedRouter);
+app.use("/government-services", governmentServicesRouter);
+app.patch("/services/reorder", (req, res, next) => {
+  req.url = "/reorder";
+  governmentServicesRouter(req, res, next);
+});
+app.use(router);
+
 // Real-Time Server-Sent Events (SSE) stream for instant multi-device data synchronization
 app.get("/api/events/live", sseHandler);
+app.get("/events/live", sseHandler);
 
-app.get("/api/services", async (req, res, next) => {
+const handleServicesFetch = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (req.query.type === "government") {
     req.url = "/";
     governmentServicesRouter(req, res, next);
@@ -111,7 +123,10 @@ app.get("/api/services", async (req, res, next) => {
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch services" });
   }
-});
+};
+
+app.get("/api/services", handleServicesFetch);
+app.get("/services", handleServicesFetch);
 
 // Production: Serve frontend static build and client-side SPA routing fallback
 const clientDistDir = path.resolve(process.cwd(), "artifacts/airnet-computers/dist/public");
