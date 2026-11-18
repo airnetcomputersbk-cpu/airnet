@@ -151,25 +151,35 @@ export async function getStoredDriveCredentials() {
     .from(reportSettingsTable)
     .where(eq(reportSettingsTable.id, "daily_report"));
 
+  const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_DRIVE_CLIENT_SECRET = "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";
+
   const clientId =
     driveSettings?.googleClientId ||
     process.env.GOOGLE_DRIVE_CLIENT_ID ||
     mailSettings?.gmailClientId ||
     process.env.GMAIL_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||
-    "";
+    DEFAULT_DRIVE_CLIENT_ID;
 
   let clientSecret = "";
   if (driveSettings?.googleClientSecretEncrypted) {
     clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
-  } else if (process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
     clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-  } else if (mailSettings?.gmailClientSecretEncrypted) {
+  }
+  if (!clientSecret && mailSettings?.gmailClientSecretEncrypted) {
     clientSecret = decrypt(mailSettings.gmailClientSecretEncrypted);
-  } else if (process.env.GMAIL_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
     clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  } else if (process.env.GOOGLE_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
     clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  }
+  if (!clientSecret) {
+    clientSecret = DEFAULT_DRIVE_CLIENT_SECRET;
   }
 
   const refreshToken = driveSettings?.encryptedRefreshToken

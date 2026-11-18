@@ -38,10 +38,20 @@ export async function getStoredGmailCredentials() {
   await ensureReportTablesExist();
   const [settings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
 
-  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || "";
-  const clientSecret = settings?.gmailClientSecretEncrypted
-    ? decrypt(settings.gmailClientSecretEncrypted)
-    : process.env.GMAIL_CLIENT_SECRET || "";
+  const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_GMAIL_CLIENT_SECRET = "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";
+
+  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || DEFAULT_GMAIL_CLIENT_ID;
+  let clientSecret = "";
+  if (settings?.gmailClientSecretEncrypted) {
+    clientSecret = decrypt(settings.gmailClientSecretEncrypted);
+  }
+  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
+    clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  }
+  if (!clientSecret) {
+    clientSecret = DEFAULT_GMAIL_CLIENT_SECRET;
+  }
 
   const refreshToken = settings?.gmailRefreshTokenEncrypted
     ? decrypt(settings.gmailRefreshTokenEncrypted)

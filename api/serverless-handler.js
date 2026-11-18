@@ -55868,8 +55868,19 @@ import nodemailer from "nodemailer";
 async function getStoredGmailCredentials() {
   await ensureReportTablesExist();
   const [settings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
-  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || "";
-  const clientSecret = settings?.gmailClientSecretEncrypted ? decrypt(settings.gmailClientSecretEncrypted) : process.env.GMAIL_CLIENT_SECRET || "";
+  const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_GMAIL_CLIENT_SECRET = "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";
+  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || DEFAULT_GMAIL_CLIENT_ID;
+  let clientSecret = "";
+  if (settings?.gmailClientSecretEncrypted) {
+    clientSecret = decrypt(settings.gmailClientSecretEncrypted);
+  }
+  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
+    clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  }
+  if (!clientSecret) {
+    clientSecret = DEFAULT_GMAIL_CLIENT_SECRET;
+  }
   const refreshToken = settings?.gmailRefreshTokenEncrypted ? decrypt(settings.gmailRefreshTokenEncrypted) : process.env.GMAIL_REFRESH_TOKEN || "";
   const accessToken = settings?.gmailAccessTokenEncrypted ? decrypt(settings.gmailAccessTokenEncrypted) : "";
   return {
@@ -57976,18 +57987,27 @@ async function getStoredDriveCredentials() {
   await ensureDriveTables();
   const [driveSettings] = await db.select().from(googleDriveSettingsTable).where(eq(googleDriveSettingsTable.id, "drive_config"));
   const [mailSettings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
-  const clientId = driveSettings?.googleClientId || process.env.GOOGLE_DRIVE_CLIENT_ID || mailSettings?.gmailClientId || process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "";
+  const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_DRIVE_CLIENT_SECRET = "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";
+  const clientId = driveSettings?.googleClientId || process.env.GOOGLE_DRIVE_CLIENT_ID || mailSettings?.gmailClientId || process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || DEFAULT_DRIVE_CLIENT_ID;
   let clientSecret = "";
   if (driveSettings?.googleClientSecretEncrypted) {
     clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
-  } else if (process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
     clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-  } else if (mailSettings?.gmailClientSecretEncrypted) {
+  }
+  if (!clientSecret && mailSettings?.gmailClientSecretEncrypted) {
     clientSecret = decrypt(mailSettings.gmailClientSecretEncrypted);
-  } else if (process.env.GMAIL_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
     clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  } else if (process.env.GOOGLE_CLIENT_SECRET) {
+  }
+  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
     clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  }
+  if (!clientSecret) {
+    clientSecret = DEFAULT_DRIVE_CLIENT_SECRET;
   }
   const refreshToken = driveSettings?.encryptedRefreshToken ? decrypt(driveSettings.encryptedRefreshToken) : process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "";
   const accessToken = driveSettings?.encryptedAccessToken ? decrypt(driveSettings.encryptedAccessToken) : "";
