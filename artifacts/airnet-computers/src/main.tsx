@@ -9,6 +9,7 @@ import PathwayWindow from './components/PathwayWindow.tsx';
 import './index.css';
 
 import PathwayPopout from './pages/admin/PathwayPopout.tsx';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 const AdminLayout = lazy(() => import('./pages/admin/Layout.tsx'));
 
 const queryClient = new QueryClient({
@@ -38,15 +39,21 @@ function Root() {
     <QueryClientProvider client={queryClient}>
       <ModalProvider>
         <PathwayProvider>
-          <Suspense fallback={<AdminFallback />}>
-            <Switch>
-              <Route path="/admin/pathway/popout" component={PathwayPopout} />
-              <Route path="/admin/*" component={AdminLayout} />
-              <Route path="*" component={App} />
-            </Switch>
-          </Suspense>
+          <ErrorBoundary fallbackTitle="Application Error">
+            <Suspense fallback={<AdminFallback />}>
+              <Switch>
+                <Route path="/admin/pathway/popout" component={PathwayPopout} />
+                <Route path="/admin/*" component={AdminLayout} />
+                <Route path="*" component={App} />
+              </Switch>
+            </Suspense>
+          </ErrorBoundary>
           {/* Always-on-top Floating Desktop Window across all tabs and routes */}
-          {!isPopout && <PathwayWindow />}
+          {!isPopout && (
+            <ErrorBoundary fallbackTitle="Pathway Window Error">
+              <PathwayWindow />
+            </ErrorBoundary>
+          )}
         </PathwayProvider>
       </ModalProvider>
     </QueryClientProvider>

@@ -531,13 +531,15 @@ export default function PathwayWindow() {
   if (!isOpen) return null;
 
   // Filter customers for dropdown switcher
-  const filteredCustomers = customers.filter((c) => {
-    const q = searchQuery.toLowerCase();
+  const customerList = Array.isArray(customers) ? customers : [];
+  const filteredCustomers = customerList.filter((c) => {
+    if (!c) return false;
+    const q = (searchQuery || "").toLowerCase();
     return (
-      c.customerName?.toLowerCase().includes(q) ||
-      c.customerId?.toLowerCase().includes(q) ||
-      c.mobileNumber?.includes(q) ||
-      c.serviceName?.toLowerCase().includes(q)
+      (c.customerName || "").toLowerCase().includes(q) ||
+      String(c.customerId || "").toLowerCase().includes(q) ||
+      String(c.mobileNumber || "").includes(q) ||
+      (c.serviceName || "").toLowerCase().includes(q)
     );
   });
 
@@ -1787,8 +1789,6 @@ export default function PathwayWindow() {
           ) : !isMaximized ? (
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "se")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 text-slate-400 hover:text-cyan-600 transition-colors"
               title="Drag corner to resize both directions"
             >

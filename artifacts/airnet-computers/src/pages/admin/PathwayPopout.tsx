@@ -77,13 +77,15 @@ export function PathwayPopoutView({ onRestore }: { onRestore?: () => void }) {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const filteredCustomers = customers.filter((c) => {
-    const q = searchQuery.toLowerCase();
+  const customerList = Array.isArray(customers) ? customers : [];
+  const filteredCustomers = customerList.filter((c) => {
+    if (!c) return false;
+    const q = (searchQuery || "").toLowerCase();
     return (
-      c.customerName?.toLowerCase().includes(q) ||
-      c.customerId?.toLowerCase().includes(q) ||
-      c.mobileNumber?.includes(q) ||
-      c.serviceName?.toLowerCase().includes(q)
+      (c.customerName || "").toLowerCase().includes(q) ||
+      String(c.customerId || "").toLowerCase().includes(q) ||
+      String(c.mobileNumber || "").includes(q) ||
+      (c.serviceName || "").toLowerCase().includes(q)
     );
   });
 

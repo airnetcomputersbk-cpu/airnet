@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { authMiddleware } from "../middlewares/auth";
 import { 
   db, 
@@ -86,7 +86,7 @@ adminRouter.post("/forgot-password/verify-reset", async (req, res) => {
 });
 
 // Helper to determine the exact origin of incoming requests safely (protects against dummy env values and external referers like Google)
-export function getSafeRequestOrigin(req: express.Request): string {
+export function getSafeRequestOrigin(req: Request): string {
   const customOrigin = (req.query?.origin as string) || "";
   if (
     customOrigin &&

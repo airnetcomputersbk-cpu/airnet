@@ -23,6 +23,7 @@ import {
   Route as RouteIcon
 } from "lucide-react";
 import PathwaySystemTray from "../../components/PathwaySystemTray";
+import ErrorBoundary from "../../components/ErrorBoundary";
 
 const Dashboard = lazy(() => import("./Dashboard"));
 const AdminLogin = lazy(() => import("./Login"));
@@ -431,28 +432,30 @@ export default function AdminLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 print:p-2 print:overflow-visible custom-scrollbar">
-          <Suspense fallback={<ModuleLoadingFallback />}>
-            <Switch>
-              <Route path="/admin/dashboard" component={Dashboard} />
-              <Route path="/admin/pathway" component={Pathway} />
-              <Route path="/admin/tracker" component={ApplicationTracker} />
-              <Route path="/admin/services" component={Services} />
-              <Route path="/admin/government-services" component={GovernmentServices} />
-              <Route path="/admin/services-gov" component={GovernmentServices} />
-              <Route path="/admin/enquiries" component={Enquiries} />
-              <Route path="/admin/records" component={Records} />
-              <Route path="/admin/documents" component={Documents} />
-              <Route path="/admin/reports" component={Reports} />
-              <Route path="/admin/daily-reports" component={DailyReports} />
-              <Route path="/admin/backup" component={Backup} />
-              <Route path="/admin/notifications" component={NotificationsAdmin} />
-              <Route path="/admin/settings" component={AdminSettings} />
-              <Route path="/admin/ai-suggestions" component={AISuggestions} />
-              <Route path="/admin/*">
-                <div className="text-2xl font-bold">Coming Soon</div>
-              </Route>
-            </Switch>
-          </Suspense>
+          <ErrorBoundary fallbackTitle="Admin Module Error">
+            <Suspense fallback={<ModuleLoadingFallback />}>
+              <Switch>
+                <Route path="/admin/dashboard" component={Dashboard} />
+                <Route path="/admin/pathway" component={Pathway} />
+                <Route path="/admin/tracker" component={ApplicationTracker} />
+                <Route path="/admin/services" component={Services} />
+                <Route path="/admin/government-services" component={GovernmentServices} />
+                <Route path="/admin/services-gov" component={GovernmentServices} />
+                <Route path="/admin/enquiries" component={Enquiries} />
+                <Route path="/admin/records" component={Records} />
+                <Route path="/admin/documents" component={Documents} />
+                <Route path="/admin/reports" component={Reports} />
+                <Route path="/admin/daily-reports" component={DailyReports} />
+                <Route path="/admin/backup" component={Backup} />
+                <Route path="/admin/notifications" component={NotificationsAdmin} />
+                <Route path="/admin/settings" component={AdminSettings} />
+                <Route path="/admin/ai-suggestions" component={AISuggestions} />
+                <Route path="/admin/*">
+                  <div className="text-2xl font-bold">Coming Soon</div>
+                </Route>
+              </Switch>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

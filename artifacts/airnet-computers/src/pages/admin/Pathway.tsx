@@ -60,31 +60,37 @@ export default function PathwayPage() {
     );
   };
 
-  const filtered = customers.filter((c) => {
-    const q = search.toLowerCase();
+  const customerList = Array.isArray(customers) ? customers : [];
+
+  const filtered = customerList.filter((c) => {
+    if (!c) return false;
+    const q = (search || "").toLowerCase();
     const matchesSearch =
-      c.customerName?.toLowerCase().includes(q) ||
-      c.customerId?.toLowerCase().includes(q) ||
-      c.mobileNumber?.includes(q) ||
-      c.serviceName?.toLowerCase().includes(q);
+      (c.customerName || "").toLowerCase().includes(q) ||
+      String(c.customerId || "").toLowerCase().includes(q) ||
+      String(c.mobileNumber || "").includes(q) ||
+      (c.serviceName || "").toLowerCase().includes(q);
 
     const matchesStatus =
       statusFilter === "all" ||
-      c.applicationStatus?.toLowerCase() === statusFilter.toLowerCase();
+      String(c.applicationStatus || "").toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
 
   // Analytics stats
-  const totalCustomers = customers.length;
-  const inProgressCount = customers.filter(
-    (c) => c.applicationStatus?.toLowerCase() === "in progress"
+  const totalCustomers = customerList.length;
+  const inProgressCount = customerList.filter(
+    (c) => String(c?.applicationStatus || "").toLowerCase() === "in progress"
   ).length;
-  const completedCount = customers.filter(
-    (c) => c.applicationStatus?.toLowerCase() === "completed"
+  const completedCount = customerList.filter(
+    (c) => String(c?.applicationStatus || "").toLowerCase() === "completed"
   ).length;
-  const pendingCount = customers.filter(
-    (c) => c.applicationStatus?.toLowerCase() === "pending" || c.applicationStatus?.toLowerCase() === "new"
+  const pendingCount = customerList.filter(
+    (c) => {
+      const s = String(c?.applicationStatus || "").toLowerCase();
+      return s === "pending" || s === "new";
+    }
   ).length;
 
   return (
