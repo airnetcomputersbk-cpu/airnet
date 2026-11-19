@@ -2018,7 +2018,7 @@ adminRouter.get("/gmail/auth-url", async (req, res) => {
   }
 });
 
-// 12. Disconnect Gmail Account (revokes tokens and removes from DB)
+// 12. Disconnect Gmail Account (revokes tokens and removes from DB, keeps OAuth App credentials intact)
 adminRouter.post("/gmail/disconnect", async (req, res) => {
   try {
     const { disconnectGmailAccount, getGmailIntegrationStatus } = await import("../lib/gmail-oauth-service");
@@ -2035,6 +2035,27 @@ adminRouter.post("/gmail/disconnect", async (req, res) => {
     res.status(500).json({ error: error.message || "Failed to disconnect Gmail account" });
   }
 });
+
+// 13. Explicitly Delete/Remove Google OAuth Client ID & Secret (Admin Action Only)
+const handleDeleteGmailCredentials = async (req: any, res: any) => {
+  try {
+    const { deleteGmailAppCredentials, getGmailIntegrationStatus } = await import("../lib/gmail-oauth-service");
+    const result = await deleteGmailAppCredentials();
+    const status = await getGmailIntegrationStatus();
+
+    res.json({
+      success: true,
+      message: result.message,
+      status,
+    });
+  } catch (error: any) {
+    console.error("Error deleting Gmail credentials:", error);
+    res.status(500).json({ error: error.message || "Failed to delete Google OAuth credentials" });
+  }
+};
+
+adminRouter.delete("/gmail/credentials", handleDeleteGmailCredentials);
+adminRouter.post("/gmail/delete-credentials", handleDeleteGmailCredentials);
 
 // 14. Send Test Email using official Gmail API
 adminRouter.post("/gmail/test-email", async (req, res) => {
@@ -2251,12 +2272,14 @@ adminRouter.get("/google-drive/status", async (req, res) => {
     const creds = await getStoredDriveCredentials();
     res.json({
       configured: Boolean(creds.clientId && creds.clientSecret),
+      permanentlySaved: Boolean(creds.clientId && creds.clientSecret),
       connected: Boolean(creds.refreshToken && creds.connectionStatus.includes("Connected")),
       connectedEmail: creds.connectedEmail,
       connectionStatus: creds.connectionStatus,
       hasClientId: Boolean(creds.clientId),
       hasClientSecret: Boolean(creds.clientSecret),
       clientId: creds.clientId ? `${creds.clientId.slice(0, 15)}...apps.googleusercontent.com` : null,
+      fullClientId: creds.clientId || null,
       rootFolderId: creds.rootFolderId,
       customerDocumentsFolderId: creds.customerDocumentsFolderId,
       tokenExpiry: creds.tokenExpiry ? creds.tokenExpiry.toISOString() : null,
@@ -2281,7 +2304,7 @@ adminRouter.get("/google-drive/auth", async (req, res) => {
   }
 });
 
-// 3. Save or update Google Cloud OAuth Client ID & Secret
+// 3. Save or update Google Cloud OAuth Client ID & Secret (Permanently stored in DB)
 adminRouter.post("/google-drive/credentials", async (req, res) => {
   try {
     const { clientId, clientSecret } = req.body || {};
@@ -2294,27 +2317,43 @@ adminRouter.post("/google-drive/credentials", async (req, res) => {
     await logDocumentActivity({
       actionType: "connect_drive",
       actionStatus: "success",
-      errorDetails: "Updated Google Cloud OAuth Client Credentials",
+      errorDetails: "Permanently saved Google Cloud OAuth Client Credentials in database",
     });
-    res.json({ success: true, message: "Google Drive OAuth credentials saved successfully" });
+    res.json({ success: true, message: "Google Drive OAuth credentials saved successfully in database" });
   } catch (err: any) {
     console.error("[admin] Error saving Drive credentials:", err);
     res.status(500).json({ error: err.message || "Failed to save Google Drive credentials" });
   }
 });
 
-// 4. Disconnect Google Drive Account
+// 4. Disconnect Google Drive Account (Clears runtime session tokens, preserves saved Client ID & Secret)
 adminRouter.post("/google-drive/disconnect", async (req, res) => {
   try {
     const { disconnectGoogleDrive } = await import("../lib/google-drive-service");
     await disconnectGoogleDrive();
     broadcastEvent("documents", "update", { type: "disconnect" });
-    res.json({ success: true, message: "Google Drive account disconnected successfully" });
+    res.json({ success: true, message: "Google Drive session disconnected successfully. Credentials remain securely saved." });
   } catch (err: any) {
     console.error("[admin] Error disconnecting Google Drive:", err);
     res.status(500).json({ error: "Failed to disconnect Google Drive" });
   }
 });
+
+// 4b. Explicitly Delete/Remove Google Drive OAuth Client ID & Secret (Admin Action Only)
+const handleDeleteDriveCredentials = async (req: any, res: any) => {
+  try {
+    const { deleteDriveClientCredentials } = await import("../lib/google-drive-service");
+    await deleteDriveClientCredentials();
+    broadcastEvent("documents", "update", { type: "credentials_deleted" });
+    res.json({ success: true, message: "Google Drive OAuth credentials have been completely deleted by admin." });
+  } catch (err: any) {
+    console.error("[admin] Error deleting Google Drive credentials:", err);
+    res.status(500).json({ error: "Failed to delete Google Drive credentials" });
+  }
+};
+
+adminRouter.delete("/google-drive/credentials", handleDeleteDriveCredentials);
+adminRouter.post("/google-drive/delete-credentials", handleDeleteDriveCredentials);
 
 // 5. Fetch all Customer Records from Ledger Records with Google Drive Documents
 adminRouter.get("/documents/customers", async (req, res) => {

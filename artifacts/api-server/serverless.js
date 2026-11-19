@@ -55868,9 +55868,806 @@ var init_encryption = __esm({
   }
 });
 
+// src/lib/google-drive-service.ts
+var google_drive_service_exports = {};
+__export(google_drive_service_exports, {
+  deleteCustomerFolderFromDrive: () => deleteCustomerFolderFromDrive,
+  deleteDriveClientCredentials: () => deleteDriveClientCredentials,
+  deleteFileFromDrive: () => deleteFileFromDrive,
+  disconnectGoogleDrive: () => disconnectGoogleDrive,
+  ensureDriveFolderHierarchy: () => ensureDriveFolderHierarchy,
+  ensureDriveTables: () => ensureDriveTables,
+  generateDriveAuthUrl: () => generateDriveAuthUrl,
+  getDriveRedirectUri: () => getDriveRedirectUri,
+  getFileMediaStream: () => getFileMediaStream,
+  getOrCreateCustomerFolder: () => getOrCreateCustomerFolder,
+  getStoredDriveCredentials: () => getStoredDriveCredentials,
+  getValidDriveAccessToken: () => getValidDriveAccessToken,
+  handleDriveOAuthCallback: () => handleDriveOAuthCallback,
+  logDocumentActivity: () => logDocumentActivity,
+  renameCustomerFolder: () => renameCustomerFolder,
+  updateDriveClientCredentials: () => updateDriveClientCredentials,
+  uploadDocumentToDrive: () => uploadDocumentToDrive
+});
+import stream from "node:stream";
+async function ensureDriveTables() {
+  try {
+    const { pool: pool2 } = await Promise.resolve().then(() => (init_src(), src_exports));
+    await pool2.query(`
+      CREATE TABLE IF NOT EXISTS google_drive_settings (
+        id TEXT PRIMARY KEY DEFAULT 'drive_config',
+        google_account_email TEXT,
+        google_client_id TEXT,
+        google_client_secret_encrypted TEXT,
+        encrypted_refresh_token TEXT,
+        encrypted_access_token TEXT,
+        token_expiry TIMESTAMP,
+        root_folder_id TEXT,
+        customer_documents_folder_id TEXT,
+        connection_status TEXT DEFAULT 'Disconnected' NOT NULL,
+        last_error TEXT,
+        connected_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_documents (
+        id SERIAL PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        customer_name TEXT,
+        service_name TEXT,
+        acknowledgement_number TEXT,
+        drive_file_id TEXT NOT NULL,
+        drive_folder_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        file_extension TEXT,
+        file_size INTEGER NOT NULL,
+        category TEXT DEFAULT 'General',
+        notes TEXT,
+        uploaded_by TEXT DEFAULT 'Admin' NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        upload_status TEXT DEFAULT 'completed' NOT NULL,
+        deletion_status TEXT DEFAULT 'active' NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS document_activity_logs (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT DEFAULT 'Admin',
+        customer_id TEXT,
+        drive_file_id TEXT,
+        file_name TEXT,
+        action_type TEXT NOT NULL,
+        action_status TEXT NOT NULL,
+        error_details TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_cust_docs_cid ON customer_documents(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_cust_docs_drive_file_id ON customer_documents(drive_file_id);
+      CREATE INDEX IF NOT EXISTS idx_cust_docs_uploaded_at ON customer_documents(uploaded_at);
+      CREATE INDEX IF NOT EXISTS idx_doc_logs_customer_id ON document_activity_logs(customer_id);
+      CREATE INDEX IF NOT EXISTS idx_doc_logs_timestamp ON document_activity_logs(timestamp);
+    `);
+    await pool2.query(`DELETE FROM google_drive_settings WHERE id != 'drive_config'`);
+    const [existing] = await db.select().from(googleDriveSettingsTable).where(eq(googleDriveSettingsTable.id, "drive_config"));
+    const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+    const DEFAULT_DRIVE_CLIENT_SECRET = "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";
+    const DEFAULT_GOOGLE_EMAIL = "airnetcomputersbk@gmail.com";
+    if (!existing) {
+      await db.insert(googleDriveSettingsTable).values({
+        id: "drive_config",
+        googleAccountEmail: DEFAULT_GOOGLE_EMAIL,
+        googleClientId: DEFAULT_DRIVE_CLIENT_ID,
+        googleClientSecretEncrypted: encrypt(DEFAULT_DRIVE_CLIENT_SECRET),
+        connectionStatus: "Disconnected"
+      });
+    } else if (!existing.googleClientId || !existing.googleClientSecretEncrypted) {
+      await db.update(googleDriveSettingsTable).set({
+        googleAccountEmail: existing.googleAccountEmail || DEFAULT_GOOGLE_EMAIL,
+        googleClientId: existing.googleClientId || DEFAULT_DRIVE_CLIENT_ID,
+        googleClientSecretEncrypted: existing.googleClientSecretEncrypted || encrypt(DEFAULT_DRIVE_CLIENT_SECRET),
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+    }
+  } catch (err) {
+    console.error("[google-drive-service] Failed to ensure tables:", err.message);
+  }
+}
+async function logDocumentActivity(params) {
+  try {
+    await db.insert(documentActivityLogsTable).values({
+      userId: params.userId || "Admin",
+      customerId: params.customerId || null,
+      driveFileId: params.driveFileId || null,
+      fileName: params.fileName || null,
+      actionType: params.actionType,
+      actionStatus: params.actionStatus,
+      errorDetails: params.errorDetails || null
+    });
+  } catch (e) {
+    console.error("[google-drive-service] Activity log error:", e.message);
+  }
+}
+async function getStoredDriveCredentials() {
+  await ensureDriveTables();
+  const [driveSettings] = await db.select().from(googleDriveSettingsTable).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  const [mailSettings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
+  const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
+  const DEFAULT_DRIVE_CLIENT_SECRET = "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";
+  const clientId = driveSettings?.googleClientId || process.env.GOOGLE_DRIVE_CLIENT_ID || mailSettings?.gmailClientId || process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || DEFAULT_DRIVE_CLIENT_ID;
+  let clientSecret = "";
+  if (driveSettings?.googleClientSecretEncrypted) {
+    clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
+  }
+  if (!clientSecret && process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
+    clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  }
+  if (!clientSecret && mailSettings?.gmailClientSecretEncrypted) {
+    clientSecret = decrypt(mailSettings.gmailClientSecretEncrypted);
+  }
+  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
+    clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  }
+  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
+    clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  }
+  if (!clientSecret) {
+    clientSecret = DEFAULT_DRIVE_CLIENT_SECRET;
+  }
+  if (driveSettings && (!driveSettings.googleClientId || !driveSettings.googleClientSecretEncrypted || !decrypt(driveSettings.googleClientSecretEncrypted))) {
+    try {
+      await db.update(googleDriveSettingsTable).set({
+        googleClientId: clientId.trim(),
+        googleClientSecretEncrypted: encrypt(clientSecret.trim()),
+        googleAccountEmail: driveSettings.googleAccountEmail || "airnetcomputersbk@gmail.com",
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+    } catch (e) {
+      console.warn("[google-drive-service] Failed to auto-heal credentials in DB:", e.message);
+    }
+  }
+  const refreshToken = driveSettings?.encryptedRefreshToken ? decrypt(driveSettings.encryptedRefreshToken) : process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "";
+  const accessToken = driveSettings?.encryptedAccessToken ? decrypt(driveSettings.encryptedAccessToken) : "";
+  return {
+    clientId: clientId.trim(),
+    clientSecret: clientSecret.trim(),
+    refreshToken: refreshToken.trim(),
+    accessToken: accessToken.trim(),
+    tokenExpiry: driveSettings?.tokenExpiry || null,
+    connectedEmail: driveSettings?.googleAccountEmail || null,
+    connectionStatus: driveSettings?.connectionStatus || "Disconnected",
+    rootFolderId: driveSettings?.rootFolderId || null,
+    customerDocumentsFolderId: driveSettings?.customerDocumentsFolderId || null,
+    lastError: driveSettings?.lastError || null,
+    driveSettings
+  };
+}
+async function updateDriveClientCredentials(clientId, clientSecret) {
+  await ensureDriveTables();
+  const encrypted = encrypt(clientSecret.trim());
+  await db.update(googleDriveSettingsTable).set({
+    googleClientId: clientId.trim(),
+    googleClientSecretEncrypted: encrypted,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  try {
+    await db.update(reportSettingsTable).set({
+      gmailClientId: clientId.trim(),
+      gmailClientSecretEncrypted: encrypted,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(reportSettingsTable.id, "daily_report"));
+  } catch (err) {
+    console.warn("[google-drive-service] Syncing client secret to report_settings skipped:", err.message);
+  }
+}
+async function deleteDriveClientCredentials() {
+  await ensureDriveTables();
+  await db.update(googleDriveSettingsTable).set({
+    googleClientId: null,
+    googleClientSecretEncrypted: null,
+    encryptedRefreshToken: null,
+    encryptedAccessToken: null,
+    tokenExpiry: null,
+    connectionStatus: "Disconnected",
+    lastError: null,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  await logDocumentActivity({
+    actionType: "disconnect_drive",
+    actionStatus: "success",
+    errorDetails: "Admin explicitly deleted Google Drive OAuth Client Credentials"
+  });
+}
+function getDriveRedirectUri(customOrigin) {
+  if (process.env.GOOGLE_DRIVE_REDIRECT_URI && !process.env.GOOGLE_DRIVE_REDIRECT_URI.includes("your-app-name")) {
+    return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
+  }
+  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
+  if (origin.includes("your-app-name") || origin.includes("google.com") || origin.includes("undefined")) {
+    origin = "https://airnet-tp3z.vercel.app";
+  }
+  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
+    origin = origin.replace(/^http:\/\//, "https://");
+  }
+  return `${origin.replace(/\/$/, "")}/api/admin/google-drive/callback`;
+}
+async function generateDriveAuthUrl(origin) {
+  const creds = await getStoredDriveCredentials();
+  if (!creds.clientId || !creds.clientSecret) {
+    throw new Error(
+      "Google Cloud OAuth Client ID & Client Secret are not configured. Please configure them in Google Drive Settings."
+    );
+  }
+  const redirectUri = getDriveRedirectUri(origin);
+  const scopes = [
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/gmail.send"
+  ].join(" ");
+  const state = `drive_${Math.random().toString(36).substring(2, 15)}`;
+  const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authUrl.searchParams.set("client_id", creds.clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("scope", scopes);
+  authUrl.searchParams.set("access_type", "offline");
+  authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("include_granted_scopes", "true");
+  authUrl.searchParams.set("state", state);
+  return {
+    url: authUrl.toString(),
+    redirectUri,
+    hasCredentials: true
+  };
+}
+async function handleDriveOAuthCallback(code, origin) {
+  const creds = await getStoredDriveCredentials();
+  const redirectUri = getDriveRedirectUri(origin);
+  if (!creds.clientId || !creds.clientSecret) {
+    throw new Error("Missing Google OAuth Client ID or Client Secret");
+  }
+  const tokenParams = new URLSearchParams({
+    code,
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code"
+  });
+  let tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: tokenParams.toString()
+  });
+  if (!tokenRes.ok && redirectUri.includes("localhost")) {
+    const altRedirectUri = redirectUri.includes("5000") ? redirectUri.replace("5000", "5001") : redirectUri.replace("5001", "5000");
+    const altParams = new URLSearchParams({
+      code,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
+      redirect_uri: altRedirectUri,
+      grant_type: "authorization_code"
+    });
+    const altRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: altParams.toString()
+    });
+    if (altRes.ok) {
+      tokenRes = altRes;
+    }
+  }
+  if (!tokenRes.ok) {
+    const errData = await tokenRes.json().catch(() => ({}));
+    const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
+    console.error("[google-drive-service] Token exchange failed:", errData);
+    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
+      throw new Error(`Google Drive token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Google Drive Settings.`);
+    }
+    throw new Error(`Google Drive token exchange failed: ${errorMsg}`);
+  }
+  const tokenData = await tokenRes.json();
+  const accessToken = tokenData.access_token;
+  const refreshToken = tokenData.refresh_token || creds.refreshToken;
+  const expiresIn = Number(tokenData.expires_in) || 3600;
+  const expiryDate = new Date(Date.now() + expiresIn * 1e3);
+  if (!refreshToken) {
+    throw new Error("Google did not return a refresh token. Please re-authorize with consent prompt.");
+  }
+  let connectedEmail = "airnetcomputersbk@gmail.com";
+  try {
+    const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (userinfoRes.ok) {
+      const info = await userinfoRes.json();
+      if (info.email) {
+        connectedEmail = info.email;
+      }
+    }
+  } catch (err) {
+    console.warn("[google-drive-service] Failed to fetch email from userinfo:", err);
+  }
+  const encRefreshToken = encrypt(refreshToken);
+  const encAccessToken = encrypt(accessToken);
+  await db.update(googleDriveSettingsTable).set({
+    googleAccountEmail: connectedEmail,
+    connectionStatus: "Connected & Authorized",
+    encryptedRefreshToken: encRefreshToken,
+    encryptedAccessToken: encAccessToken,
+    tokenExpiry: expiryDate,
+    lastError: null,
+    connectedAt: /* @__PURE__ */ new Date(),
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  try {
+    await db.update(reportSettingsTable).set({
+      emailProvider: "gmail_api",
+      gmailConnectedEmail: connectedEmail,
+      gmailConnectionStatus: "Connected & Authorized",
+      gmailRefreshTokenEncrypted: encRefreshToken,
+      gmailAccessTokenEncrypted: encAccessToken,
+      gmailTokenExpiry: expiryDate,
+      gmailLastError: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(reportSettingsTable.id, "daily_report"));
+    console.log(`[google-drive-service] Cross-persisted OAuth tokens to report_settings for: ${connectedEmail}`);
+  } catch (syncErr) {
+    console.warn("[google-drive-service] Cross-persisting tokens to report_settings skipped:", syncErr.message);
+  }
+  try {
+    await ensureDriveFolderHierarchy(accessToken);
+  } catch (fErr) {
+    console.error("[google-drive-service] Failed to initialize folder hierarchy:", fErr.message);
+  }
+  await logDocumentActivity({
+    actionType: "connect_drive",
+    actionStatus: "success",
+    errorDetails: `Connected Google Drive account: ${connectedEmail}`
+  });
+  return { email: connectedEmail, success: true };
+}
+async function disconnectGoogleDrive() {
+  await ensureDriveTables();
+  await db.update(googleDriveSettingsTable).set({
+    connectionStatus: "Disconnected",
+    encryptedRefreshToken: null,
+    encryptedAccessToken: null,
+    tokenExpiry: null,
+    lastError: null,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  await logDocumentActivity({
+    actionType: "disconnect_drive",
+    actionStatus: "success",
+    errorDetails: "Disconnected Google Drive account session"
+  });
+}
+async function getValidDriveAccessToken() {
+  const creds = await getStoredDriveCredentials();
+  if (!creds.refreshToken) {
+    throw new Error("Google Drive is not connected. Please connect your Google account in Documents.");
+  }
+  if (creds.accessToken && creds.tokenExpiry) {
+    const expiryMs = new Date(creds.tokenExpiry).getTime();
+    if (expiryMs - Date.now() > 5 * 60 * 1e3) {
+      return creds.accessToken;
+    }
+  }
+  const refreshParams = new URLSearchParams({
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
+    refresh_token: creds.refreshToken,
+    grant_type: "refresh_token"
+  });
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: refreshParams.toString()
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    const errorMsg = errData.error_description || errData.error || `HTTP ${res.status}`;
+    const isRevoked = errData.error === "invalid_grant";
+    if (isRevoked) {
+      await db.update(googleDriveSettingsTable).set({
+        connectionStatus: "Error / Re-auth Required",
+        lastError: errorMsg,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+    }
+    throw new Error(`Google Drive token refresh failed: ${errorMsg}`);
+  }
+  const data = await res.json();
+  const newAccessToken = data.access_token;
+  const expiresIn = Number(data.expires_in) || 3600;
+  const expiryDate = new Date(Date.now() + expiresIn * 1e3);
+  const encAccessToken = encrypt(newAccessToken);
+  const updatePayload = {
+    encryptedAccessToken: encAccessToken,
+    tokenExpiry: expiryDate,
+    connectionStatus: "Connected & Authorized",
+    lastError: null,
+    updatedAt: /* @__PURE__ */ new Date()
+  };
+  if (data.refresh_token) {
+    updatePayload.encryptedRefreshToken = encrypt(data.refresh_token);
+  }
+  await db.update(googleDriveSettingsTable).set(updatePayload).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  try {
+    const reportUpdatePayload = {
+      gmailAccessTokenEncrypted: encAccessToken,
+      gmailTokenExpiry: expiryDate,
+      gmailConnectionStatus: "Connected & Authorized",
+      gmailLastError: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    if (data.refresh_token) {
+      reportUpdatePayload.gmailRefreshTokenEncrypted = encrypt(data.refresh_token);
+    }
+    await db.update(reportSettingsTable).set(reportUpdatePayload).where(eq(reportSettingsTable.id, "daily_report"));
+  } catch (syncErr) {
+  }
+  return newAccessToken;
+}
+async function driveFetch(url2, options = {}, retryCount = 0) {
+  const res = await fetch(url2, options);
+  if (!res.ok && (res.status === 429 || res.status >= 500) && retryCount < 3) {
+    const delay = Math.pow(2, retryCount) * 1e3;
+    console.warn(`[google-drive] Rate limited or server error (${res.status}). Retrying in ${delay}ms...`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return driveFetch(url2, options, retryCount + 1);
+  }
+  return res;
+}
+async function ensureDriveFolderHierarchy(passedAccessToken) {
+  const accessToken = passedAccessToken || await getValidDriveAccessToken();
+  const creds = await getStoredDriveCredentials();
+  let rootFolderId = creds.rootFolderId;
+  let customerDocumentsFolderId = creds.customerDocumentsFolderId;
+  if (rootFolderId) {
+    const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${rootFolderId}?fields=id,name,trashed`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!checkRes.ok || (await checkRes.json()).trashed) {
+      rootFolderId = null;
+    }
+  }
+  if (!rootFolderId) {
+    const searchRes = await driveFetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        "mimeType = 'application/vnd.google-apps.folder' and name = 'AIRNET COMPUTERS' and trashed = false"
+      )}&fields=files(id,name)`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      if (data.files && data.files.length > 0) {
+        rootFolderId = data.files[0].id;
+      }
+    }
+  }
+  if (!rootFolderId) {
+    const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: "AIRNET COMPUTERS",
+        mimeType: "application/vnd.google-apps.folder"
+      })
+    });
+    if (!createRes.ok) {
+      throw new Error(`Failed to create 'AIRNET COMPUTERS' root folder: ${createRes.statusText}`);
+    }
+    const created = await createRes.json();
+    rootFolderId = created.id;
+  }
+  if (customerDocumentsFolderId) {
+    const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${customerDocumentsFolderId}?fields=id,name,trashed`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!checkRes.ok || (await checkRes.json()).trashed) {
+      customerDocumentsFolderId = null;
+    }
+  }
+  if (!customerDocumentsFolderId) {
+    const searchRes = await driveFetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `mimeType = 'application/vnd.google-apps.folder' and name = 'Customer Documents' and '${rootFolderId}' in parents and trashed = false`
+      )}&fields=files(id,name)`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      if (data.files && data.files.length > 0) {
+        customerDocumentsFolderId = data.files[0].id;
+      }
+    }
+  }
+  if (!customerDocumentsFolderId) {
+    const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: "Customer Documents",
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [rootFolderId]
+      })
+    });
+    if (!createRes.ok) {
+      throw new Error(`Failed to create 'Customer Documents' folder: ${createRes.statusText}`);
+    }
+    const created = await createRes.json();
+    customerDocumentsFolderId = created.id;
+  }
+  await db.update(googleDriveSettingsTable).set({
+    rootFolderId,
+    customerDocumentsFolderId,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  return {
+    rootFolderId: rootFolderId || "",
+    customerDocumentsFolderId: customerDocumentsFolderId || ""
+  };
+}
+async function getOrCreateCustomerFolder(customerId, customerName) {
+  const accessToken = await getValidDriveAccessToken();
+  const { customerDocumentsFolderId } = await ensureDriveFolderHierarchy(accessToken);
+  const [existingDoc] = await db.select({ driveFolderId: customerDocumentsTable.driveFolderId }).from(customerDocumentsTable).where(eq(customerDocumentsTable.customerId, customerId)).limit(1);
+  if (existingDoc?.driveFolderId) {
+    const checkRes = await driveFetch(
+      `https://www.googleapis.com/drive/v3/files/${existingDoc.driveFolderId}?fields=id,trashed`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (checkRes.ok) {
+      const data = await checkRes.json();
+      if (!data.trashed) {
+        return existingDoc.driveFolderId;
+      }
+    }
+  }
+  const escapedCid = customerId.replace(/'/g, "\\'");
+  const q = `mimeType = 'application/vnd.google-apps.folder' and name contains '${escapedCid}' and '${customerDocumentsFolderId}' in parents and trashed = false`;
+  const searchRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (searchRes.ok) {
+    const data = await searchRes.json();
+    if (data.files && data.files.length > 0) {
+      return data.files[0].id;
+    }
+  }
+  const folderName = `${customerId} - ${customerName.trim() || "Customer"}`;
+  const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [customerDocumentsFolderId]
+    })
+  });
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Failed to create Google Drive customer folder: ${errText}`);
+  }
+  const created = await createRes.json();
+  return created.id;
+}
+async function renameCustomerFolder(folderId, customerId, newCustomerName) {
+  try {
+    const accessToken = await getValidDriveAccessToken();
+    const folderName = `${customerId} - ${newCustomerName.trim() || "Customer"}`;
+    await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name: folderName })
+    });
+  } catch (err) {
+    console.warn(`[google-drive] Could not rename folder ${folderId}:`, err.message);
+  }
+}
+async function uploadDocumentToDrive(params) {
+  const { customerId, customerName, fileName, mimeType, fileBuffer } = params;
+  const accessToken = await getValidDriveAccessToken();
+  const folderId = await getOrCreateCustomerFolder(customerId, customerName);
+  const q = `name = '${fileName.replace(/'/g, "\\'")}' and '${folderId}' in parents and trashed = false`;
+  const searchRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  let finalFileName = fileName;
+  if (searchRes.ok) {
+    const data = await searchRes.json();
+    if (data.files && data.files.length > 0) {
+      const dotIndex = fileName.lastIndexOf(".");
+      if (dotIndex !== -1) {
+        finalFileName = `${fileName.slice(0, dotIndex)} (${Date.now().toString().slice(-4)})${fileName.slice(dotIndex)}`;
+      } else {
+        finalFileName = `${fileName} (${Date.now().toString().slice(-4)})`;
+      }
+    }
+  }
+  let fileId = "";
+  let webViewLink = "";
+  let thumbnailLink = "";
+  if (fileBuffer.length > 5 * 1024 * 1024) {
+    const initRes = await driveFetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "X-Upload-Content-Type": mimeType,
+          "X-Upload-Content-Length": String(fileBuffer.length)
+        },
+        body: JSON.stringify({
+          name: finalFileName,
+          parents: [folderId]
+        })
+      }
+    );
+    if (!initRes.ok) {
+      throw new Error(`Failed to initialize resumable Drive upload: ${initRes.statusText}`);
+    }
+    const uploadUrl = initRes.headers.get("location");
+    if (!uploadUrl) {
+      throw new Error("Missing upload session location from Google Drive");
+    }
+    const uploadRes = await driveFetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Length": String(fileBuffer.length),
+        "Content-Type": mimeType
+      },
+      body: fileBuffer
+    });
+    if (!uploadRes.ok) {
+      throw new Error(`Failed to upload chunks to Google Drive: ${uploadRes.statusText}`);
+    }
+    const uploadedData = await uploadRes.json();
+    fileId = uploadedData.id;
+    webViewLink = uploadedData.webViewLink;
+  } else {
+    const boundary = `-------AIRNET_DRIVE_${Date.now()}`;
+    const delimiter = `\r
+--${boundary}\r
+`;
+    const closeDelimiter = `\r
+--${boundary}--`;
+    const metadata = JSON.stringify({
+      name: finalFileName,
+      parents: [folderId]
+    });
+    const multipartRequestBody = Buffer.concat([
+      Buffer.from(
+        delimiter + "Content-Type: application/json; charset=UTF-8\r\n\r\n" + metadata + delimiter + `Content-Type: ${mimeType}\r
+\r
+`
+      ),
+      fileBuffer,
+      Buffer.from(closeDelimiter)
+    ]);
+    const uploadRes = await driveFetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,thumbnailLink",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Length": String(multipartRequestBody.length)
+        },
+        body: multipartRequestBody
+      }
+    );
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      throw new Error(`Google Drive multipart upload failed: ${errText}`);
+    }
+    const uploadedData = await uploadRes.json();
+    fileId = uploadedData.id;
+    webViewLink = uploadedData.webViewLink;
+    thumbnailLink = uploadedData.thumbnailLink;
+  }
+  return {
+    fileId,
+    fileName: finalFileName,
+    mimeType,
+    fileSize: fileBuffer.length,
+    webViewLink,
+    thumbnailLink
+  };
+}
+async function getFileMediaStream(driveFileId) {
+  const accessToken = await getValidDriveAccessToken();
+  const metaRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=id,name,mimeType,size`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  let fileName = "document";
+  let contentType = "application/octet-stream";
+  let contentLength;
+  if (metaRes.ok) {
+    const meta = await metaRes.json();
+    fileName = meta.name || fileName;
+    contentType = meta.mimeType || contentType;
+    if (meta.size) contentLength = Number(meta.size);
+  }
+  const mediaRes = await driveFetch(
+    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!mediaRes.ok) {
+    throw new Error(`Failed to download file from Google Drive: HTTP ${mediaRes.status}`);
+  }
+  if (mediaRes.body) {
+    const nodeStream = stream.Readable.fromWeb(mediaRes.body);
+    return {
+      stream: nodeStream,
+      contentType,
+      contentLength,
+      fileName
+    };
+  }
+  throw new Error("No media stream body returned by Google Drive API");
+}
+async function deleteFileFromDrive(driveFileId) {
+  try {
+    const accessToken = await getValidDriveAccessToken();
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (res.status === 204 || res.status === 404) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error(`[google-drive] Error deleting file ${driveFileId}:`, err.message);
+    throw err;
+  }
+}
+async function deleteCustomerFolderFromDrive(folderId) {
+  try {
+    const accessToken = await getValidDriveAccessToken();
+    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    return res.status === 204 || res.status === 404;
+  } catch (err) {
+    console.warn(`[google-drive] Could not delete folder ${folderId}:`, err.message);
+    return false;
+  }
+}
+var init_google_drive_service = __esm({
+  "src/lib/google-drive-service.ts"() {
+    "use strict";
+    init_src();
+    init_drizzle_orm();
+    init_encryption();
+    ensureDriveTables();
+  }
+});
+
 // src/lib/gmail-oauth-service.ts
 var gmail_oauth_service_exports = {};
 __export(gmail_oauth_service_exports, {
+  deleteGmailAppCredentials: () => deleteGmailAppCredentials,
   disconnectGmailAccount: () => disconnectGmailAccount,
   generateGoogleAuthUrl: () => generateGoogleAuthUrl,
   getGmailIntegrationStatus: () => getGmailIntegrationStatus,
@@ -55885,18 +56682,39 @@ import nodemailer from "nodemailer";
 async function getStoredGmailCredentials() {
   await ensureReportTablesExist();
   const [settings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
+  const { googleDriveSettingsTable: googleDriveSettingsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+  const [driveSettings] = await db.select().from(googleDriveSettingsTable3).where(eq(googleDriveSettingsTable3.id, "drive_config"));
   const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
   const DEFAULT_GMAIL_CLIENT_SECRET = "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";
-  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || DEFAULT_GMAIL_CLIENT_ID;
+  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || driveSettings?.googleClientId || DEFAULT_GMAIL_CLIENT_ID;
   let clientSecret = "";
   if (settings?.gmailClientSecretEncrypted) {
     clientSecret = decrypt(settings.gmailClientSecretEncrypted);
   }
+  if (!clientSecret && driveSettings?.googleClientSecretEncrypted) {
+    clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
+  }
   if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
     clientSecret = process.env.GMAIL_CLIENT_SECRET;
   }
+  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
+    clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  }
   if (!clientSecret) {
     clientSecret = DEFAULT_GMAIL_CLIENT_SECRET;
+  }
+  if (settings && (!settings.gmailClientId || !settings.gmailClientSecretEncrypted || !decrypt(settings.gmailClientSecretEncrypted))) {
+    try {
+      await db.update(reportSettingsTable).set({
+        gmailClientId: clientId.trim(),
+        gmailClientSecretEncrypted: encrypt(clientSecret.trim()),
+        adminEmail: settings.adminEmail || "airnetcomputersbk@gmail.com",
+        recipientEmail: settings.recipientEmail || "rasoolahmed246@gmail.com",
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(reportSettingsTable.id, "daily_report"));
+    } catch (e) {
+      console.warn("[gmail-oauth] Failed to auto-heal credentials in DB:", e.message);
+    }
   }
   const refreshToken = settings?.gmailRefreshTokenEncrypted ? decrypt(settings.gmailRefreshTokenEncrypted) : process.env.GMAIL_REFRESH_TOKEN || "";
   const accessToken = settings?.gmailAccessTokenEncrypted ? decrypt(settings.gmailAccessTokenEncrypted) : "";
@@ -55935,7 +56753,8 @@ async function generateGoogleAuthUrl(origin) {
   const redirectUri = getRedirectUri(origin);
   const scopes = [
     "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/userinfo.email"
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/drive.file"
   ].join(" ");
   const state = Math.random().toString(36).substring(2, 15);
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -55945,6 +56764,7 @@ async function generateGoogleAuthUrl(origin) {
   authUrl.searchParams.set("scope", scopes);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("include_granted_scopes", "true");
   authUrl.searchParams.set("state", state);
   return {
     url: authUrl.toString(),
@@ -56001,16 +56821,37 @@ async function handleOAuthCallback(code, origin) {
   } catch (profErr) {
     console.warn("[gmail-oauth] Could not query user profile:", profErr);
   }
+  const encRefreshToken = encrypt(refreshToken);
+  const encAccessToken = encrypt(accessToken);
   await db.update(reportSettingsTable).set({
     emailProvider: "gmail_api",
     gmailConnectedEmail: connectedEmail,
     gmailConnectionStatus: "Connected & Authorized",
-    gmailRefreshTokenEncrypted: encrypt(refreshToken),
-    gmailAccessTokenEncrypted: encrypt(accessToken),
+    gmailRefreshTokenEncrypted: encRefreshToken,
+    gmailAccessTokenEncrypted: encAccessToken,
     gmailTokenExpiry: expiryDate,
     gmailLastError: null,
     updatedAt: /* @__PURE__ */ new Date()
   }).where(eq(reportSettingsTable.id, "daily_report"));
+  try {
+    const { googleDriveSettingsTable: googleDriveSettingsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+    await db.update(googleDriveSettingsTable3).set({
+      googleAccountEmail: connectedEmail,
+      connectionStatus: "Connected & Authorized",
+      encryptedRefreshToken: encRefreshToken,
+      encryptedAccessToken: encAccessToken,
+      tokenExpiry: expiryDate,
+      lastError: null,
+      connectedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(googleDriveSettingsTable3.id, "drive_config"));
+    console.log(`[gmail-oauth] Cross-persisted OAuth tokens to Google Drive: ${connectedEmail}`);
+    const { ensureDriveFolderHierarchy: ensureDriveFolderHierarchy2 } = await Promise.resolve().then(() => (init_google_drive_service(), google_drive_service_exports));
+    await ensureDriveFolderHierarchy2(accessToken).catch(() => {
+    });
+  } catch (syncErr) {
+    console.warn("[gmail-oauth] Cross-persist to google_drive_settings skipped:", syncErr.message);
+  }
   console.log(`[gmail-oauth] Successfully authorized Gmail account: ${connectedEmail}`);
   return { email: connectedEmail, success: true };
 }
@@ -56043,24 +56884,46 @@ async function getValidAccessToken() {
     const isRevoked = errData.error === "invalid_grant";
     const statusMsg = isRevoked ? "Authorization Revoked / Expired" : "Refresh Failed";
     const errMsg = isRevoked ? "Google account authorization was revoked or expired. Please click 'Reconnect Gmail Account' to restore automated sending." : errData.error_description || errData.error || `HTTP ${res.status}`;
-    await db.update(reportSettingsTable).set({
-      gmailConnectionStatus: statusMsg,
-      gmailLastError: errMsg,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(reportSettingsTable.id, "daily_report"));
+    if (isRevoked) {
+      await db.update(reportSettingsTable).set({
+        gmailConnectionStatus: statusMsg,
+        gmailLastError: errMsg,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(reportSettingsTable.id, "daily_report"));
+    }
     throw new Error(`Gmail authorization error: ${errMsg}`);
   }
   const data = await res.json();
   const newAccessToken = data.access_token;
   const expiresIn = Number(data.expires_in) || 3600;
   const newExpiry = new Date(Date.now() + expiresIn * 1e3);
-  await db.update(reportSettingsTable).set({
-    gmailAccessTokenEncrypted: encrypt(newAccessToken),
+  const encAccessToken = encrypt(newAccessToken);
+  const updatePayload = {
+    gmailAccessTokenEncrypted: encAccessToken,
     gmailTokenExpiry: newExpiry,
     gmailConnectionStatus: "Connected & Authorized",
     gmailLastError: null,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(reportSettingsTable.id, "daily_report"));
+  };
+  if (data.refresh_token) {
+    updatePayload.gmailRefreshTokenEncrypted = encrypt(data.refresh_token);
+  }
+  await db.update(reportSettingsTable).set(updatePayload).where(eq(reportSettingsTable.id, "daily_report"));
+  try {
+    const { googleDriveSettingsTable: googleDriveSettingsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+    const driveUpdate = {
+      encryptedAccessToken: encAccessToken,
+      tokenExpiry: newExpiry,
+      connectionStatus: "Connected & Authorized",
+      lastError: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    if (data.refresh_token) {
+      driveUpdate.encryptedRefreshToken = encrypt(data.refresh_token);
+    }
+    await db.update(googleDriveSettingsTable3).set(driveUpdate).where(eq(googleDriveSettingsTable3.id, "drive_config"));
+  } catch (syncErr) {
+  }
   return newAccessToken;
 }
 async function sendEmailViaGmailApi({
@@ -56161,7 +57024,37 @@ async function disconnectGmailAccount() {
     gmailLastError: null,
     updatedAt: /* @__PURE__ */ new Date()
   }).where(eq(reportSettingsTable.id, "daily_report"));
-  return { success: true, message: "Gmail account disconnected successfully" };
+  return { success: true, message: "Gmail account session disconnected successfully" };
+}
+async function deleteGmailAppCredentials() {
+  await ensureReportTablesExist();
+  await db.update(reportSettingsTable).set({
+    gmailClientId: null,
+    gmailClientSecretEncrypted: null,
+    gmailRefreshTokenEncrypted: null,
+    gmailAccessTokenEncrypted: null,
+    gmailTokenExpiry: null,
+    gmailConnectedEmail: null,
+    gmailConnectionStatus: "Disconnected",
+    gmailLastError: null,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq(reportSettingsTable.id, "daily_report"));
+  try {
+    const { googleDriveSettingsTable: googleDriveSettingsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+    await db.update(googleDriveSettingsTable3).set({
+      googleClientId: null,
+      googleClientSecretEncrypted: null,
+      encryptedRefreshToken: null,
+      encryptedAccessToken: null,
+      tokenExpiry: null,
+      connectionStatus: "Disconnected",
+      lastError: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(googleDriveSettingsTable3.id, "drive_config"));
+  } catch (err) {
+    console.warn("[gmail-oauth] Deleting client credentials from google_drive_settings skipped:", err.message);
+  }
+  return { success: true, message: "Google OAuth credentials permanently deleted by admin" };
 }
 async function saveGmailAppCredentials(clientId, clientSecret) {
   await ensureReportTablesExist();
@@ -56182,7 +57075,7 @@ async function saveGmailAppCredentials(clientId, clientSecret) {
       googleClientId: cId,
       googleClientSecretEncrypted: encrypted,
       updatedAt: /* @__PURE__ */ new Date()
-    });
+    }).where(eq(googleDriveSettingsTable3.id, "drive_config"));
   } catch (err) {
     console.warn("[gmail-oauth] Syncing client secret to google_drive_settings skipped:", err.message);
   }
@@ -57915,716 +58808,6 @@ var init_government_services_resolver = __esm({
   }
 });
 
-// src/lib/google-drive-service.ts
-var google_drive_service_exports = {};
-__export(google_drive_service_exports, {
-  deleteCustomerFolderFromDrive: () => deleteCustomerFolderFromDrive,
-  deleteFileFromDrive: () => deleteFileFromDrive,
-  disconnectGoogleDrive: () => disconnectGoogleDrive,
-  ensureDriveFolderHierarchy: () => ensureDriveFolderHierarchy,
-  ensureDriveTables: () => ensureDriveTables,
-  generateDriveAuthUrl: () => generateDriveAuthUrl,
-  getDriveRedirectUri: () => getDriveRedirectUri,
-  getFileMediaStream: () => getFileMediaStream,
-  getOrCreateCustomerFolder: () => getOrCreateCustomerFolder,
-  getStoredDriveCredentials: () => getStoredDriveCredentials,
-  getValidDriveAccessToken: () => getValidDriveAccessToken,
-  handleDriveOAuthCallback: () => handleDriveOAuthCallback,
-  logDocumentActivity: () => logDocumentActivity,
-  renameCustomerFolder: () => renameCustomerFolder,
-  updateDriveClientCredentials: () => updateDriveClientCredentials,
-  uploadDocumentToDrive: () => uploadDocumentToDrive
-});
-import stream from "node:stream";
-async function ensureDriveTables() {
-  try {
-    const { pool: pool2 } = await Promise.resolve().then(() => (init_src(), src_exports));
-    await pool2.query(`
-      CREATE TABLE IF NOT EXISTS google_drive_settings (
-        id TEXT PRIMARY KEY DEFAULT 'drive_config',
-        google_account_email TEXT,
-        google_client_id TEXT,
-        google_client_secret_encrypted TEXT,
-        encrypted_refresh_token TEXT,
-        encrypted_access_token TEXT,
-        token_expiry TIMESTAMP,
-        root_folder_id TEXT,
-        customer_documents_folder_id TEXT,
-        connection_status TEXT DEFAULT 'Disconnected' NOT NULL,
-        last_error TEXT,
-        connected_at TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS customer_documents (
-        id SERIAL PRIMARY KEY,
-        customer_id TEXT NOT NULL,
-        customer_name TEXT,
-        service_name TEXT,
-        acknowledgement_number TEXT,
-        drive_file_id TEXT NOT NULL,
-        drive_folder_id TEXT NOT NULL,
-        file_name TEXT NOT NULL,
-        mime_type TEXT NOT NULL,
-        file_extension TEXT,
-        file_size INTEGER NOT NULL,
-        category TEXT DEFAULT 'General',
-        notes TEXT,
-        uploaded_by TEXT DEFAULT 'Admin' NOT NULL,
-        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        upload_status TEXT DEFAULT 'completed' NOT NULL,
-        deletion_status TEXT DEFAULT 'active' NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS document_activity_logs (
-        id SERIAL PRIMARY KEY,
-        user_id TEXT DEFAULT 'Admin',
-        customer_id TEXT,
-        drive_file_id TEXT,
-        file_name TEXT,
-        action_type TEXT NOT NULL,
-        action_status TEXT NOT NULL,
-        error_details TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_cust_docs_cid ON customer_documents(customer_id);
-      CREATE INDEX IF NOT EXISTS idx_cust_docs_drive_file_id ON customer_documents(drive_file_id);
-      CREATE INDEX IF NOT EXISTS idx_cust_docs_uploaded_at ON customer_documents(uploaded_at);
-      CREATE INDEX IF NOT EXISTS idx_doc_logs_customer_id ON document_activity_logs(customer_id);
-      CREATE INDEX IF NOT EXISTS idx_doc_logs_timestamp ON document_activity_logs(timestamp);
-    `);
-    const [existing] = await db.select().from(googleDriveSettingsTable).where(eq(googleDriveSettingsTable.id, "drive_config"));
-    if (!existing) {
-      await db.insert(googleDriveSettingsTable).values({
-        id: "drive_config",
-        connectionStatus: "Disconnected"
-      });
-    }
-  } catch (err) {
-    console.error("[google-drive-service] Failed to ensure tables:", err.message);
-  }
-}
-async function logDocumentActivity(params) {
-  try {
-    await db.insert(documentActivityLogsTable).values({
-      userId: params.userId || "Admin",
-      customerId: params.customerId || null,
-      driveFileId: params.driveFileId || null,
-      fileName: params.fileName || null,
-      actionType: params.actionType,
-      actionStatus: params.actionStatus,
-      errorDetails: params.errorDetails || null
-    });
-  } catch (e) {
-    console.error("[google-drive-service] Activity log error:", e.message);
-  }
-}
-async function getStoredDriveCredentials() {
-  await ensureDriveTables();
-  const [driveSettings] = await db.select().from(googleDriveSettingsTable).where(eq(googleDriveSettingsTable.id, "drive_config"));
-  const [mailSettings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
-  const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
-  const DEFAULT_DRIVE_CLIENT_SECRET = "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";
-  const clientId = driveSettings?.googleClientId || process.env.GOOGLE_DRIVE_CLIENT_ID || mailSettings?.gmailClientId || process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || DEFAULT_DRIVE_CLIENT_ID;
-  let clientSecret = "";
-  if (driveSettings?.googleClientSecretEncrypted) {
-    clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
-  }
-  if (!clientSecret && process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
-    clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-  }
-  if (!clientSecret && mailSettings?.gmailClientSecretEncrypted) {
-    clientSecret = decrypt(mailSettings.gmailClientSecretEncrypted);
-  }
-  if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
-    clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  }
-  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
-    clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  }
-  if (!clientSecret) {
-    clientSecret = DEFAULT_DRIVE_CLIENT_SECRET;
-  }
-  const refreshToken = driveSettings?.encryptedRefreshToken ? decrypt(driveSettings.encryptedRefreshToken) : process.env.GOOGLE_DRIVE_REFRESH_TOKEN || "";
-  const accessToken = driveSettings?.encryptedAccessToken ? decrypt(driveSettings.encryptedAccessToken) : "";
-  return {
-    clientId: clientId.trim(),
-    clientSecret: clientSecret.trim(),
-    refreshToken: refreshToken.trim(),
-    accessToken: accessToken.trim(),
-    tokenExpiry: driveSettings?.tokenExpiry || null,
-    connectedEmail: driveSettings?.googleAccountEmail || null,
-    connectionStatus: driveSettings?.connectionStatus || "Disconnected",
-    rootFolderId: driveSettings?.rootFolderId || null,
-    customerDocumentsFolderId: driveSettings?.customerDocumentsFolderId || null,
-    lastError: driveSettings?.lastError || null,
-    driveSettings
-  };
-}
-async function updateDriveClientCredentials(clientId, clientSecret) {
-  await ensureDriveTables();
-  const encrypted = encrypt(clientSecret.trim());
-  await db.update(googleDriveSettingsTable).set({
-    googleClientId: clientId.trim(),
-    googleClientSecretEncrypted: encrypted,
-    updatedAt: /* @__PURE__ */ new Date()
-  });
-  try {
-    await db.update(reportSettingsTable).set({
-      gmailClientId: clientId.trim(),
-      gmailClientSecretEncrypted: encrypted,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(reportSettingsTable.id, "daily_report"));
-  } catch (err) {
-    console.warn("[google-drive-service] Syncing client secret to report_settings skipped:", err.message);
-  }
-}
-function getDriveRedirectUri(customOrigin) {
-  if (process.env.GOOGLE_DRIVE_REDIRECT_URI && !process.env.GOOGLE_DRIVE_REDIRECT_URI.includes("your-app-name")) {
-    return process.env.GOOGLE_DRIVE_REDIRECT_URI.trim();
-  }
-  let origin = customOrigin || process.env.AIRNET_COMPUTERS_URL || process.env.BASE_URL || "https://airnet-tp3z.vercel.app";
-  if (origin.includes("your-app-name") || origin.includes("google.com") || origin.includes("undefined")) {
-    origin = "https://airnet-tp3z.vercel.app";
-  }
-  if (!origin.startsWith("http://localhost") && !origin.startsWith("https://")) {
-    origin = origin.replace(/^http:\/\//, "https://");
-  }
-  return `${origin.replace(/\/$/, "")}/api/admin/google-drive/callback`;
-}
-async function generateDriveAuthUrl(origin) {
-  const creds = await getStoredDriveCredentials();
-  if (!creds.clientId || !creds.clientSecret) {
-    throw new Error(
-      "Google Cloud OAuth Client ID & Client Secret are not configured. Please configure them in Google Drive Settings."
-    );
-  }
-  const redirectUri = getDriveRedirectUri(origin);
-  const scopes = [
-    "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/userinfo.email"
-  ].join(" ");
-  const state = `drive_${Math.random().toString(36).substring(2, 15)}`;
-  const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-  authUrl.searchParams.set("client_id", creds.clientId);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("response_type", "code");
-  authUrl.searchParams.set("scope", scopes);
-  authUrl.searchParams.set("access_type", "offline");
-  authUrl.searchParams.set("prompt", "consent");
-  authUrl.searchParams.set("state", state);
-  return {
-    url: authUrl.toString(),
-    redirectUri,
-    hasCredentials: true
-  };
-}
-async function handleDriveOAuthCallback(code, origin) {
-  const creds = await getStoredDriveCredentials();
-  const redirectUri = getDriveRedirectUri(origin);
-  if (!creds.clientId || !creds.clientSecret) {
-    throw new Error("Missing Google OAuth Client ID or Client Secret");
-  }
-  const tokenParams = new URLSearchParams({
-    code,
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: "authorization_code"
-  });
-  let tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: tokenParams.toString()
-  });
-  if (!tokenRes.ok && redirectUri.includes("localhost")) {
-    const altRedirectUri = redirectUri.includes("5000") ? redirectUri.replace("5000", "5001") : redirectUri.replace("5001", "5000");
-    const altParams = new URLSearchParams({
-      code,
-      client_id: creds.clientId,
-      client_secret: creds.clientSecret,
-      redirect_uri: altRedirectUri,
-      grant_type: "authorization_code"
-    });
-    const altRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: altParams.toString()
-    });
-    if (altRes.ok) {
-      tokenRes = altRes;
-    }
-  }
-  if (!tokenRes.ok) {
-    const errData = await tokenRes.json().catch(() => ({}));
-    const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
-    console.error("[google-drive-service] Token exchange failed:", errData);
-    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
-      throw new Error(`Google Drive token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Google Drive Settings.`);
-    }
-    throw new Error(`Google Drive token exchange failed: ${errorMsg}`);
-  }
-  const tokenData = await tokenRes.json();
-  const accessToken = tokenData.access_token;
-  const refreshToken = tokenData.refresh_token || creds.refreshToken;
-  const expiresIn = Number(tokenData.expires_in) || 3600;
-  const expiryDate = new Date(Date.now() + expiresIn * 1e3);
-  if (!refreshToken) {
-    throw new Error("Google did not return a refresh token. Please re-authorize with consent prompt.");
-  }
-  let connectedEmail = "airnetcomputersbk@gmail.com";
-  try {
-    const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (userinfoRes.ok) {
-      const info = await userinfoRes.json();
-      if (info.email) {
-        connectedEmail = info.email;
-      }
-    }
-  } catch (err) {
-    console.warn("[google-drive-service] Failed to fetch email from userinfo:", err);
-  }
-  await db.update(googleDriveSettingsTable).set({
-    googleAccountEmail: connectedEmail,
-    connectionStatus: "Connected & Authorized",
-    encryptedRefreshToken: encrypt(refreshToken),
-    encryptedAccessToken: encrypt(accessToken),
-    tokenExpiry: expiryDate,
-    lastError: null,
-    connectedAt: /* @__PURE__ */ new Date(),
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
-  try {
-    await ensureDriveFolderHierarchy(accessToken);
-  } catch (fErr) {
-    console.error("[google-drive-service] Failed to initialize folder hierarchy:", fErr.message);
-  }
-  await logDocumentActivity({
-    actionType: "connect_drive",
-    actionStatus: "success",
-    errorDetails: `Connected Google Drive account: ${connectedEmail}`
-  });
-  return { email: connectedEmail, success: true };
-}
-async function disconnectGoogleDrive() {
-  await ensureDriveTables();
-  await db.update(googleDriveSettingsTable).set({
-    connectionStatus: "Disconnected",
-    encryptedRefreshToken: null,
-    encryptedAccessToken: null,
-    tokenExpiry: null,
-    lastError: null,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
-  await logDocumentActivity({
-    actionType: "disconnect_drive",
-    actionStatus: "success",
-    errorDetails: "Disconnected Google Drive account"
-  });
-}
-async function getValidDriveAccessToken() {
-  const creds = await getStoredDriveCredentials();
-  if (!creds.refreshToken) {
-    throw new Error("Google Drive is not connected. Please connect your Google account in Documents.");
-  }
-  if (creds.accessToken && creds.tokenExpiry) {
-    const expiryMs = new Date(creds.tokenExpiry).getTime();
-    if (expiryMs - Date.now() > 5 * 60 * 1e3) {
-      return creds.accessToken;
-    }
-  }
-  const refreshParams = new URLSearchParams({
-    client_id: creds.clientId,
-    client_secret: creds.clientSecret,
-    refresh_token: creds.refreshToken,
-    grant_type: "refresh_token"
-  });
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: refreshParams.toString()
-  });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    const errorMsg = errData.error_description || errData.error || `HTTP ${res.status}`;
-    await db.update(googleDriveSettingsTable).set({
-      connectionStatus: "Error / Re-auth Required",
-      lastError: errorMsg,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(googleDriveSettingsTable.id, "drive_config"));
-    throw new Error(`Google Drive token refresh failed: ${errorMsg}`);
-  }
-  const data = await res.json();
-  const newAccessToken = data.access_token;
-  const expiresIn = Number(data.expires_in) || 3600;
-  const expiryDate = new Date(Date.now() + expiresIn * 1e3);
-  await db.update(googleDriveSettingsTable).set({
-    encryptedAccessToken: encrypt(newAccessToken),
-    tokenExpiry: expiryDate,
-    connectionStatus: "Connected & Authorized",
-    lastError: null,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
-  return newAccessToken;
-}
-async function driveFetch(url2, options = {}, retryCount = 0) {
-  const res = await fetch(url2, options);
-  if (!res.ok && (res.status === 429 || res.status >= 500) && retryCount < 3) {
-    const delay = Math.pow(2, retryCount) * 1e3;
-    console.warn(`[google-drive] Rate limited or server error (${res.status}). Retrying in ${delay}ms...`);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    return driveFetch(url2, options, retryCount + 1);
-  }
-  return res;
-}
-async function ensureDriveFolderHierarchy(passedAccessToken) {
-  const accessToken = passedAccessToken || await getValidDriveAccessToken();
-  const creds = await getStoredDriveCredentials();
-  let rootFolderId = creds.rootFolderId;
-  let customerDocumentsFolderId = creds.customerDocumentsFolderId;
-  if (rootFolderId) {
-    const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${rootFolderId}?fields=id,name,trashed`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!checkRes.ok || (await checkRes.json()).trashed) {
-      rootFolderId = null;
-    }
-  }
-  if (!rootFolderId) {
-    const searchRes = await driveFetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        "mimeType = 'application/vnd.google-apps.folder' and name = 'AIRNET COMPUTERS' and trashed = false"
-      )}&fields=files(id,name)`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (searchRes.ok) {
-      const data = await searchRes.json();
-      if (data.files && data.files.length > 0) {
-        rootFolderId = data.files[0].id;
-      }
-    }
-  }
-  if (!rootFolderId) {
-    const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        name: "AIRNET COMPUTERS",
-        mimeType: "application/vnd.google-apps.folder"
-      })
-    });
-    if (!createRes.ok) {
-      throw new Error(`Failed to create 'AIRNET COMPUTERS' root folder: ${createRes.statusText}`);
-    }
-    const created = await createRes.json();
-    rootFolderId = created.id;
-  }
-  if (customerDocumentsFolderId) {
-    const checkRes = await driveFetch(`https://www.googleapis.com/drive/v3/files/${customerDocumentsFolderId}?fields=id,name,trashed`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!checkRes.ok || (await checkRes.json()).trashed) {
-      customerDocumentsFolderId = null;
-    }
-  }
-  if (!customerDocumentsFolderId) {
-    const searchRes = await driveFetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        `mimeType = 'application/vnd.google-apps.folder' and name = 'Customer Documents' and '${rootFolderId}' in parents and trashed = false`
-      )}&fields=files(id,name)`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (searchRes.ok) {
-      const data = await searchRes.json();
-      if (data.files && data.files.length > 0) {
-        customerDocumentsFolderId = data.files[0].id;
-      }
-    }
-  }
-  if (!customerDocumentsFolderId) {
-    const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        name: "Customer Documents",
-        mimeType: "application/vnd.google-apps.folder",
-        parents: [rootFolderId]
-      })
-    });
-    if (!createRes.ok) {
-      throw new Error(`Failed to create 'Customer Documents' folder: ${createRes.statusText}`);
-    }
-    const created = await createRes.json();
-    customerDocumentsFolderId = created.id;
-  }
-  await db.update(googleDriveSettingsTable).set({
-    rootFolderId,
-    customerDocumentsFolderId,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
-  return {
-    rootFolderId: rootFolderId || "",
-    customerDocumentsFolderId: customerDocumentsFolderId || ""
-  };
-}
-async function getOrCreateCustomerFolder(customerId, customerName) {
-  const accessToken = await getValidDriveAccessToken();
-  const { customerDocumentsFolderId } = await ensureDriveFolderHierarchy(accessToken);
-  const [existingDoc] = await db.select({ driveFolderId: customerDocumentsTable.driveFolderId }).from(customerDocumentsTable).where(eq(customerDocumentsTable.customerId, customerId)).limit(1);
-  if (existingDoc?.driveFolderId) {
-    const checkRes = await driveFetch(
-      `https://www.googleapis.com/drive/v3/files/${existingDoc.driveFolderId}?fields=id,trashed`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (checkRes.ok) {
-      const data = await checkRes.json();
-      if (!data.trashed) {
-        return existingDoc.driveFolderId;
-      }
-    }
-  }
-  const escapedCid = customerId.replace(/'/g, "\\'");
-  const q = `mimeType = 'application/vnd.google-apps.folder' and name contains '${escapedCid}' and '${customerDocumentsFolderId}' in parents and trashed = false`;
-  const searchRes = await driveFetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (searchRes.ok) {
-    const data = await searchRes.json();
-    if (data.files && data.files.length > 0) {
-      return data.files[0].id;
-    }
-  }
-  const folderName = `${customerId} - ${customerName.trim() || "Customer"}`;
-  const createRes = await driveFetch("https://www.googleapis.com/drive/v3/files", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      name: folderName,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [customerDocumentsFolderId]
-    })
-  });
-  if (!createRes.ok) {
-    const errText = await createRes.text();
-    throw new Error(`Failed to create Google Drive customer folder: ${errText}`);
-  }
-  const created = await createRes.json();
-  return created.id;
-}
-async function renameCustomerFolder(folderId, customerId, newCustomerName) {
-  try {
-    const accessToken = await getValidDriveAccessToken();
-    const folderName = `${customerId} - ${newCustomerName.trim() || "Customer"}`;
-    await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ name: folderName })
-    });
-  } catch (err) {
-    console.warn(`[google-drive] Could not rename folder ${folderId}:`, err.message);
-  }
-}
-async function uploadDocumentToDrive(params) {
-  const { customerId, customerName, fileName, mimeType, fileBuffer } = params;
-  const accessToken = await getValidDriveAccessToken();
-  const folderId = await getOrCreateCustomerFolder(customerId, customerName);
-  const q = `name = '${fileName.replace(/'/g, "\\'")}' and '${folderId}' in parents and trashed = false`;
-  const searchRes = await driveFetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  let finalFileName = fileName;
-  if (searchRes.ok) {
-    const data = await searchRes.json();
-    if (data.files && data.files.length > 0) {
-      const dotIndex = fileName.lastIndexOf(".");
-      if (dotIndex !== -1) {
-        finalFileName = `${fileName.slice(0, dotIndex)} (${Date.now().toString().slice(-4)})${fileName.slice(dotIndex)}`;
-      } else {
-        finalFileName = `${fileName} (${Date.now().toString().slice(-4)})`;
-      }
-    }
-  }
-  let fileId = "";
-  let webViewLink = "";
-  let thumbnailLink = "";
-  if (fileBuffer.length > 5 * 1024 * 1024) {
-    const initRes = await driveFetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-          "X-Upload-Content-Type": mimeType,
-          "X-Upload-Content-Length": String(fileBuffer.length)
-        },
-        body: JSON.stringify({
-          name: finalFileName,
-          parents: [folderId]
-        })
-      }
-    );
-    if (!initRes.ok) {
-      throw new Error(`Failed to initialize resumable Drive upload: ${initRes.statusText}`);
-    }
-    const uploadUrl = initRes.headers.get("location");
-    if (!uploadUrl) {
-      throw new Error("Missing upload session location from Google Drive");
-    }
-    const uploadRes = await driveFetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Length": String(fileBuffer.length),
-        "Content-Type": mimeType
-      },
-      body: fileBuffer
-    });
-    if (!uploadRes.ok) {
-      throw new Error(`Failed to upload chunks to Google Drive: ${uploadRes.statusText}`);
-    }
-    const uploadedData = await uploadRes.json();
-    fileId = uploadedData.id;
-    webViewLink = uploadedData.webViewLink;
-  } else {
-    const boundary = `-------AIRNET_DRIVE_${Date.now()}`;
-    const delimiter = `\r
---${boundary}\r
-`;
-    const closeDelimiter = `\r
---${boundary}--`;
-    const metadata = JSON.stringify({
-      name: finalFileName,
-      parents: [folderId]
-    });
-    const multipartRequestBody = Buffer.concat([
-      Buffer.from(
-        delimiter + "Content-Type: application/json; charset=UTF-8\r\n\r\n" + metadata + delimiter + `Content-Type: ${mimeType}\r
-\r
-`
-      ),
-      fileBuffer,
-      Buffer.from(closeDelimiter)
-    ]);
-    const uploadRes = await driveFetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,thumbnailLink",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`,
-          "Content-Length": String(multipartRequestBody.length)
-        },
-        body: multipartRequestBody
-      }
-    );
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      throw new Error(`Google Drive multipart upload failed: ${errText}`);
-    }
-    const uploadedData = await uploadRes.json();
-    fileId = uploadedData.id;
-    webViewLink = uploadedData.webViewLink;
-    thumbnailLink = uploadedData.thumbnailLink;
-  }
-  return {
-    fileId,
-    fileName: finalFileName,
-    mimeType,
-    fileSize: fileBuffer.length,
-    webViewLink,
-    thumbnailLink
-  };
-}
-async function getFileMediaStream(driveFileId) {
-  const accessToken = await getValidDriveAccessToken();
-  const metaRes = await driveFetch(
-    `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=id,name,mimeType,size`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  let fileName = "document";
-  let contentType = "application/octet-stream";
-  let contentLength;
-  if (metaRes.ok) {
-    const meta = await metaRes.json();
-    fileName = meta.name || fileName;
-    contentType = meta.mimeType || contentType;
-    if (meta.size) contentLength = Number(meta.size);
-  }
-  const mediaRes = await driveFetch(
-    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  if (!mediaRes.ok) {
-    throw new Error(`Failed to download file from Google Drive: HTTP ${mediaRes.status}`);
-  }
-  if (mediaRes.body) {
-    const nodeStream = stream.Readable.fromWeb(mediaRes.body);
-    return {
-      stream: nodeStream,
-      contentType,
-      contentLength,
-      fileName
-    };
-  }
-  throw new Error("No media stream body returned by Google Drive API");
-}
-async function deleteFileFromDrive(driveFileId) {
-  try {
-    const accessToken = await getValidDriveAccessToken();
-    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (res.status === 204 || res.status === 404) {
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error(`[google-drive] Error deleting file ${driveFileId}:`, err.message);
-    throw err;
-  }
-}
-async function deleteCustomerFolderFromDrive(folderId) {
-  try {
-    const accessToken = await getValidDriveAccessToken();
-    const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${folderId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    return res.status === 204 || res.status === 404;
-  } catch (err) {
-    console.warn(`[google-drive] Could not delete folder ${folderId}:`, err.message);
-    return false;
-  }
-}
-var init_google_drive_service = __esm({
-  "src/lib/google-drive-service.ts"() {
-    "use strict";
-    init_src();
-    init_drizzle_orm();
-    init_encryption();
-    ensureDriveTables();
-  }
-});
-
 // src/lib/ai-recommendations-data.ts
 var INITIAL_AI_RECOMMENDATIONS;
 var init_ai_recommendations_data = __esm({
@@ -59308,7 +59491,7 @@ async function getPathwayCustomerDetails(id) {
   }
   return null;
 }
-var import_express2, adminRouter;
+var import_express2, adminRouter, handleDeleteGmailCredentials, handleDeleteDriveCredentials;
 var init_admin = __esm({
   "src/routes/admin.ts"() {
     "use strict";
@@ -60740,6 +60923,23 @@ ${finalNotes}`;
         res.status(500).json({ error: error40.message || "Failed to disconnect Gmail account" });
       }
     });
+    handleDeleteGmailCredentials = async (req2, res) => {
+      try {
+        const { deleteGmailAppCredentials: deleteGmailAppCredentials2, getGmailIntegrationStatus: getGmailIntegrationStatus3 } = await Promise.resolve().then(() => (init_gmail_oauth_service(), gmail_oauth_service_exports));
+        const result = await deleteGmailAppCredentials2();
+        const status = await getGmailIntegrationStatus3();
+        res.json({
+          success: true,
+          message: result.message,
+          status
+        });
+      } catch (error40) {
+        console.error("Error deleting Gmail credentials:", error40);
+        res.status(500).json({ error: error40.message || "Failed to delete Google OAuth credentials" });
+      }
+    };
+    adminRouter.delete("/gmail/credentials", handleDeleteGmailCredentials);
+    adminRouter.post("/gmail/delete-credentials", handleDeleteGmailCredentials);
     adminRouter.post("/gmail/test-email", async (req2, res) => {
       try {
         const { sendTestEmail: sendTestEmail2 } = await Promise.resolve().then(() => (init_daily_email_service(), daily_email_service_exports));
@@ -60909,12 +61109,14 @@ ${finalNotes}`;
         const creds = await getStoredDriveCredentials2();
         res.json({
           configured: Boolean(creds.clientId && creds.clientSecret),
+          permanentlySaved: Boolean(creds.clientId && creds.clientSecret),
           connected: Boolean(creds.refreshToken && creds.connectionStatus.includes("Connected")),
           connectedEmail: creds.connectedEmail,
           connectionStatus: creds.connectionStatus,
           hasClientId: Boolean(creds.clientId),
           hasClientSecret: Boolean(creds.clientSecret),
           clientId: creds.clientId ? `${creds.clientId.slice(0, 15)}...apps.googleusercontent.com` : null,
+          fullClientId: creds.clientId || null,
           rootFolderId: creds.rootFolderId,
           customerDocumentsFolderId: creds.customerDocumentsFolderId,
           tokenExpiry: creds.tokenExpiry ? creds.tokenExpiry.toISOString() : null,
@@ -60948,9 +61150,9 @@ ${finalNotes}`;
         await logDocumentActivity2({
           actionType: "connect_drive",
           actionStatus: "success",
-          errorDetails: "Updated Google Cloud OAuth Client Credentials"
+          errorDetails: "Permanently saved Google Cloud OAuth Client Credentials in database"
         });
-        res.json({ success: true, message: "Google Drive OAuth credentials saved successfully" });
+        res.json({ success: true, message: "Google Drive OAuth credentials saved successfully in database" });
       } catch (err) {
         console.error("[admin] Error saving Drive credentials:", err);
         res.status(500).json({ error: err.message || "Failed to save Google Drive credentials" });
@@ -60961,12 +61163,25 @@ ${finalNotes}`;
         const { disconnectGoogleDrive: disconnectGoogleDrive2 } = await Promise.resolve().then(() => (init_google_drive_service(), google_drive_service_exports));
         await disconnectGoogleDrive2();
         broadcastEvent("documents", "update", { type: "disconnect" });
-        res.json({ success: true, message: "Google Drive account disconnected successfully" });
+        res.json({ success: true, message: "Google Drive session disconnected successfully. Credentials remain securely saved." });
       } catch (err) {
         console.error("[admin] Error disconnecting Google Drive:", err);
         res.status(500).json({ error: "Failed to disconnect Google Drive" });
       }
     });
+    handleDeleteDriveCredentials = async (req2, res) => {
+      try {
+        const { deleteDriveClientCredentials: deleteDriveClientCredentials2 } = await Promise.resolve().then(() => (init_google_drive_service(), google_drive_service_exports));
+        await deleteDriveClientCredentials2();
+        broadcastEvent("documents", "update", { type: "credentials_deleted" });
+        res.json({ success: true, message: "Google Drive OAuth credentials have been completely deleted by admin." });
+      } catch (err) {
+        console.error("[admin] Error deleting Google Drive credentials:", err);
+        res.status(500).json({ error: "Failed to delete Google Drive credentials" });
+      }
+    };
+    adminRouter.delete("/google-drive/credentials", handleDeleteDriveCredentials);
+    adminRouter.post("/google-drive/delete-credentials", handleDeleteDriveCredentials);
     adminRouter.get("/documents/customers", async (req2, res) => {
       try {
         const filterStatus = (req2.query.status || "completed").toLowerCase();

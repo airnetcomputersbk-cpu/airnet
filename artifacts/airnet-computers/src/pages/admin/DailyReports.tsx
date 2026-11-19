@@ -421,6 +421,31 @@ export default function DailyReports() {
     }
   };
 
+  // Explicitly Delete Google OAuth Credentials from DB (Admin Action Only)
+  const handleDeleteGmailCreds = async () => {
+    if (!confirm("Are you sure you want to permanently delete Google Cloud OAuth credentials from the database? This cannot be undone.")) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/gmail/credentials", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGmailClientIdInput("");
+        setGmailClientSecretInput("");
+        setShowGmailModal(false);
+        setActionFeedback({
+          type: "info",
+          message: "Google OAuth credentials permanently deleted by admin.",
+        });
+        await fetchSettingsAndStatus();
+      } else {
+        setGmailModalError(data.error || "Failed to delete OAuth credentials");
+      }
+    } catch (err: any) {
+      setGmailModalError(err.message || "Failed to delete credentials");
+    }
+  };
+
   // Send Live Test Email via Gmail API
   const handleSendGmailTestEmail = async () => {
     setIsSendingGmailTest(true);
@@ -1659,6 +1684,15 @@ export default function DailyReports() {
                   </button>
                 </div>
 
+                {/* Permanent Storage Notice */}
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 flex items-start gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Permanently Stored in Database:</span>
+                    <span className="text-[11px] text-emerald-700">Client ID and Client Secret stay permanently saved in the database until you explicitly remove them. Disconnecting an account only revokes the temporary OAuth session.</span>
+                  </div>
+                </div>
+
                 {gmailModalError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
@@ -1727,22 +1761,36 @@ export default function DailyReports() {
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowGmailModal(false)}
-                  className="px-4 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cancel / Close
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingGmailCreds}
-                  className="px-5 py-2 bg-[#032e60] hover:bg-[#05438c] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                >
-                  {savingGmailCreds && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{savingGmailCreds ? "Encrypting & Saving..." : "Save & Connect"}</span>
-                </button>
+              <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2.5 shrink-0">
+                <div>
+                  {gmail?.hasClientId && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteGmailCreds}
+                      className="px-3 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                      title="Permanently remove credentials from database"
+                    >
+                      Delete Credentials
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowGmailModal(false)}
+                    className="px-4 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Cancel / Close
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingGmailCreds}
+                    className="px-5 py-2 bg-[#032e60] hover:bg-[#05438c] text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {savingGmailCreds && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    <span>{savingGmailCreds ? "Encrypting & Saving..." : "Save & Connect"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

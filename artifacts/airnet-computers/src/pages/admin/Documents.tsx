@@ -70,12 +70,14 @@ export interface CustomerRecordEntry {
 
 export interface DriveStatus {
   configured: boolean;
+  permanentlySaved?: boolean;
   connected: boolean;
   connectedEmail: string | null;
   connectionStatus: string;
   hasClientId: boolean;
   hasClientSecret: boolean;
   clientId: string | null;
+  fullClientId?: string | null;
   rootFolderId: string | null;
   customerDocumentsFolderId: string | null;
   tokenExpiry: string | null;
@@ -161,6 +163,9 @@ export default function Documents() {
       if (res.ok) {
         const data = await res.json();
         setDriveStatus(data);
+        if (data.fullClientId) {
+          setDriveCredentials((prev) => ({ ...prev, clientId: data.fullClientId }));
+        }
       }
     } catch (err) {
       console.error("[Documents] Failed to fetch Drive status:", err);
@@ -363,6 +368,31 @@ export default function Documents() {
       showError("Save Error", err.message);
     } finally {
       setIsSavingCredentials(false);
+    }
+  };
+
+  // Explicitly Remove/Delete OAuth Credentials (Admin Action Only)
+  const handleDeleteCredentials = async () => {
+    const confirmed = await confirmDelete({
+      title: "Permanently Delete OAuth Credentials?",
+      message:
+        "Are you sure you want to completely remove the Google OAuth Client ID & Secret from the database? This will disconnect the Google integration until you reconfigure them.",
+      itemName: "Google Cloud OAuth App Credentials",
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/admin/google-drive/credentials", { method: "DELETE" });
+      if (res.ok) {
+        showSuccess("Credentials Deleted", "Google OAuth credentials have been completely removed by admin.");
+        setDriveCredentials({ clientId: "", clientSecret: "" });
+        fetchDriveStatus();
+      } else {
+        const err = await res.json();
+        showError("Deletion Failed", err.error || "Failed to delete credentials.");
+      }
+    } catch (err: any) {
+      showError("Error", err.message);
     }
   };
 
@@ -1891,8 +1921,18 @@ export default function Documents() {
 
               {/* Client Credentials Form */}
               <form onSubmit={handleSaveCredentials} className="space-y-3 pt-2 border-t border-slate-100">
-                <div className="text-xs font-bold text-slate-800">
-                  Google Cloud OAuth Credentials
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-800">
+                    Google Cloud OAuth Credentials
+                  </div>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    Permanently Saved in DB
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 p-2 bg-emerald-50/70 border border-emerald-200 rounded-xl text-emerald-800 text-[11px]">
+                  <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                  <span>Credentials remain stored permanently until explicitly deleted by admin. Disconnecting only clears the runtime session.</span>
                 </div>
 
                 <div>
@@ -1935,14 +1975,27 @@ export default function Documents() {
                 </div>
 
                 <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
-                    onClick={handleConnectDrive}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                  >
-                    <HardDrive size={14} />
-                    <span>Authorize with Google</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConnectDrive}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <HardDrive size={14} />
+                      <span>Authorize with Google</span>
+                    </button>
+
+                    {driveStatus?.hasClientId && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteCredentials}
+                        className="px-2.5 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
+                        title="Permanently delete credentials from database"
+                      >
+                        Delete Credentials
+                      </button>
+                    )}
+                  </div>
 
                   <button
                     type="submit"

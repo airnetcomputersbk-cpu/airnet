@@ -38,19 +38,54 @@ export async function getStoredGmailCredentials() {
   await ensureReportTablesExist();
   const [settings] = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
 
+  const { googleDriveSettingsTable } = await import("@workspace/db");
+  const [driveSettings] = await db
+    .select()
+    .from(googleDriveSettingsTable)
+    .where(eq(googleDriveSettingsTable.id, "drive_config"));
+
   const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
   const DEFAULT_GMAIL_CLIENT_SECRET = "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";
 
-  const clientId = settings?.gmailClientId || process.env.GMAIL_CLIENT_ID || DEFAULT_GMAIL_CLIENT_ID;
+  const clientId =
+    settings?.gmailClientId ||
+    process.env.GMAIL_CLIENT_ID ||
+    driveSettings?.googleClientId ||
+    DEFAULT_GMAIL_CLIENT_ID;
+
   let clientSecret = "";
   if (settings?.gmailClientSecretEncrypted) {
     clientSecret = decrypt(settings.gmailClientSecretEncrypted);
   }
+  if (!clientSecret && driveSettings?.googleClientSecretEncrypted) {
+    clientSecret = decrypt(driveSettings.googleClientSecretEncrypted);
+  }
   if (!clientSecret && process.env.GMAIL_CLIENT_SECRET) {
     clientSecret = process.env.GMAIL_CLIENT_SECRET;
   }
+  if (!clientSecret && process.env.GOOGLE_CLIENT_SECRET) {
+    clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  }
   if (!clientSecret) {
     clientSecret = DEFAULT_GMAIL_CLIENT_SECRET;
+  }
+
+  // Self-heal: If database row was missing credentials or secret decryption failed, save canonical encrypted credentials permanently
+  if (settings && (!settings.gmailClientId || !settings.gmailClientSecretEncrypted || !decrypt(settings.gmailClientSecretEncrypted))) {
+    try {
+      await db
+        .update(reportSettingsTable)
+        .set({
+          gmailClientId: clientId.trim(),
+          gmailClientSecretEncrypted: encrypt(clientSecret.trim()),
+          adminEmail: settings.adminEmail || "airnetcomputersbk@gmail.com",
+          recipientEmail: settings.recipientEmail || "rasoolahmed246@gmail.com",
+          updatedAt: new Date(),
+        })
+        .where(eq(reportSettingsTable.id, "daily_report"));
+    } catch (e: any) {
+      console.warn("[gmail-oauth] Failed to auto-heal credentials in DB:", e.message);
+    }
   }
 
   const refreshToken = settings?.gmailRefreshTokenEncrypted
@@ -93,7 +128,7 @@ export function getRedirectUri(customOrigin?: string): string {
 
 /**
  * Generate Google OAuth 2.0 Consent URL
- * Scopes: gmail.send (send emails) & userinfo.email (display authorized email)
+ * Unified Scopes: gmail.send, drive.file & userinfo.email
  */
 export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: string; redirectUri: string; hasCredentials: boolean }> {
   const creds = await getStoredGmailCredentials();
@@ -108,6 +143,7 @@ export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: str
   const scopes = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/drive.file",
   ].join(" ");
 
   const state = Math.random().toString(36).substring(2, 15);
@@ -119,6 +155,7 @@ export async function generateGoogleAuthUrl(origin?: string): Promise<{ url: str
   authUrl.searchParams.set("scope", scopes);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("include_granted_scopes", "true");
   authUrl.searchParams.set("state", state);
 
   return {
@@ -191,19 +228,46 @@ export async function handleOAuthCallback(code: string, origin?: string): Promis
   }
 
   // 3. Encrypt and store tokens securely in DB
+  const encRefreshToken = encrypt(refreshToken);
+  const encAccessToken = encrypt(accessToken);
+
   await db
     .update(reportSettingsTable)
     .set({
       emailProvider: "gmail_api",
       gmailConnectedEmail: connectedEmail,
       gmailConnectionStatus: "Connected & Authorized",
-      gmailRefreshTokenEncrypted: encrypt(refreshToken),
-      gmailAccessTokenEncrypted: encrypt(accessToken),
+      gmailRefreshTokenEncrypted: encRefreshToken,
+      gmailAccessTokenEncrypted: encAccessToken,
       gmailTokenExpiry: expiryDate,
       gmailLastError: null,
       updatedAt: new Date(),
     })
     .where(eq(reportSettingsTable.id, "daily_report"));
+
+  // 4. Cross-persist to Google Drive settings so authorization connects both services
+  try {
+    const { googleDriveSettingsTable } = await import("@workspace/db");
+    await db
+      .update(googleDriveSettingsTable)
+      .set({
+        googleAccountEmail: connectedEmail,
+        connectionStatus: "Connected & Authorized",
+        encryptedRefreshToken: encRefreshToken,
+        encryptedAccessToken: encAccessToken,
+        tokenExpiry: expiryDate,
+        lastError: null,
+        connectedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(googleDriveSettingsTable.id, "drive_config"));
+    console.log(`[gmail-oauth] Cross-persisted OAuth tokens to Google Drive: ${connectedEmail}`);
+
+    const { ensureDriveFolderHierarchy } = await import("./google-drive-service");
+    await ensureDriveFolderHierarchy(accessToken).catch(() => {});
+  } catch (syncErr: any) {
+    console.warn("[gmail-oauth] Cross-persist to google_drive_settings skipped:", syncErr.message);
+  }
 
   console.log(`[gmail-oauth] Successfully authorized Gmail account: ${connectedEmail}`);
   return { email: connectedEmail, success: true };
@@ -254,14 +318,17 @@ export async function getValidAccessToken(): Promise<string> {
       ? "Google account authorization was revoked or expired. Please click 'Reconnect Gmail Account' to restore automated sending."
       : errData.error_description || errData.error || `HTTP ${res.status}`;
 
-    await db
-      .update(reportSettingsTable)
-      .set({
-        gmailConnectionStatus: statusMsg,
-        gmailLastError: errMsg,
-        updatedAt: new Date(),
-      })
-      .where(eq(reportSettingsTable.id, "daily_report"));
+    // Only mark status as revoked in database if Google explicitly returned invalid_grant
+    if (isRevoked) {
+      await db
+        .update(reportSettingsTable)
+        .set({
+          gmailConnectionStatus: statusMsg,
+          gmailLastError: errMsg,
+          updatedAt: new Date(),
+        })
+        .where(eq(reportSettingsTable.id, "daily_report"));
+    }
 
     throw new Error(`Gmail authorization error: ${errMsg}`);
   }
@@ -270,18 +337,46 @@ export async function getValidAccessToken(): Promise<string> {
   const newAccessToken = data.access_token;
   const expiresIn = Number(data.expires_in) || 3600;
   const newExpiry = new Date(Date.now() + expiresIn * 1000);
+  const encAccessToken = encrypt(newAccessToken);
 
   // Store refreshed access token
+  const updatePayload: Record<string, any> = {
+    gmailAccessTokenEncrypted: encAccessToken,
+    gmailTokenExpiry: newExpiry,
+    gmailConnectionStatus: "Connected & Authorized",
+    gmailLastError: null,
+    updatedAt: new Date(),
+  };
+
+  if (data.refresh_token) {
+    updatePayload.gmailRefreshTokenEncrypted = encrypt(data.refresh_token);
+  }
+
   await db
     .update(reportSettingsTable)
-    .set({
-      gmailAccessTokenEncrypted: encrypt(newAccessToken),
-      gmailTokenExpiry: newExpiry,
-      gmailConnectionStatus: "Connected & Authorized",
-      gmailLastError: null,
-      updatedAt: new Date(),
-    })
+    .set(updatePayload)
     .where(eq(reportSettingsTable.id, "daily_report"));
+
+  // Also sync refreshed token to Google Drive settings
+  try {
+    const { googleDriveSettingsTable } = await import("@workspace/db");
+    const driveUpdate: Record<string, any> = {
+      encryptedAccessToken: encAccessToken,
+      tokenExpiry: newExpiry,
+      connectionStatus: "Connected & Authorized",
+      lastError: null,
+      updatedAt: new Date(),
+    };
+    if (data.refresh_token) {
+      driveUpdate.encryptedRefreshToken = encrypt(data.refresh_token);
+    }
+    await db
+      .update(googleDriveSettingsTable)
+      .set(driveUpdate)
+      .where(eq(googleDriveSettingsTable.id, "drive_config"));
+  } catch (syncErr: any) {
+    // Non-critical background sync
+  }
 
   return newAccessToken;
 }
@@ -391,7 +486,7 @@ export async function sendEmailViaGmailApi({
 }
 
 /**
- * Disconnect Gmail Account (revokes tokens and removes from DB)
+ * Disconnect Gmail Account (Revokes active session tokens, preserves saved Client ID & Secret)
  */
 export async function disconnectGmailAccount(): Promise<{ success: boolean; message: string }> {
   const creds = await getStoredGmailCredentials();
@@ -420,11 +515,54 @@ export async function disconnectGmailAccount(): Promise<{ success: boolean; mess
     })
     .where(eq(reportSettingsTable.id, "daily_report"));
 
-  return { success: true, message: "Gmail account disconnected successfully" };
+  return { success: true, message: "Gmail account session disconnected successfully" };
 }
 
 /**
- * Save Google Cloud OAuth 2.0 Client ID and Secret (encrypted)
+ * Explicitly Delete/Remove Google OAuth Client ID & Secret from Database (Only on explicit Admin request)
+ */
+export async function deleteGmailAppCredentials(): Promise<{ success: boolean; message: string }> {
+  await ensureReportTablesExist();
+
+  await db
+    .update(reportSettingsTable)
+    .set({
+      gmailClientId: null,
+      gmailClientSecretEncrypted: null,
+      gmailRefreshTokenEncrypted: null,
+      gmailAccessTokenEncrypted: null,
+      gmailTokenExpiry: null,
+      gmailConnectedEmail: null,
+      gmailConnectionStatus: "Disconnected",
+      gmailLastError: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(reportSettingsTable.id, "daily_report"));
+
+  try {
+    const { googleDriveSettingsTable } = await import("@workspace/db");
+    await db
+      .update(googleDriveSettingsTable)
+      .set({
+        googleClientId: null,
+        googleClientSecretEncrypted: null,
+        encryptedRefreshToken: null,
+        encryptedAccessToken: null,
+        tokenExpiry: null,
+        connectionStatus: "Disconnected",
+        lastError: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(googleDriveSettingsTable.id, "drive_config"));
+  } catch (err: any) {
+    console.warn("[gmail-oauth] Deleting client credentials from google_drive_settings skipped:", err.message);
+  }
+
+  return { success: true, message: "Google OAuth credentials permanently deleted by admin" };
+}
+
+/**
+ * Save Google Cloud OAuth 2.0 Client ID and Secret (encrypted and permanently stored in DB)
  */
 export async function saveGmailAppCredentials(
   clientId: string,
@@ -457,7 +595,8 @@ export async function saveGmailAppCredentials(
         googleClientId: cId,
         googleClientSecretEncrypted: encrypted,
         updatedAt: new Date(),
-      });
+      })
+      .where(eq(googleDriveSettingsTable.id, "drive_config"));
   } catch (err: any) {
     console.warn("[gmail-oauth] Syncing client secret to google_drive_settings skipped:", err.message);
   }
