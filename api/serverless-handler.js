@@ -55834,20 +55834,37 @@ function decrypt(ciphertext) {
     const iv = Buffer.from(parts[0], "hex");
     const tag = Buffer.from(parts[1], "hex");
     const encrypted = Buffer.from(parts[2], "hex");
-    const decipher = crypto2.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(encrypted) + decipher.final("utf8");
+    for (const seed of CANDIDATE_SEEDS) {
+      try {
+        const candidateKey = crypto2.createHash("sha256").update(seed).digest();
+        const decipher = crypto2.createDecipheriv("aes-256-gcm", candidateKey, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = decipher.update(encrypted) + decipher.final("utf8");
+        return decrypted;
+      } catch {
+      }
+    }
+    console.error("[encryption] Failed to decrypt ciphertext with any known key");
+    return "";
   } catch (err) {
     console.error("[encryption] Failed to decrypt:", err);
     return "";
   }
 }
-var secretSeed, key;
+var PRIMARY_SEED, key, CANDIDATE_SEEDS;
 var init_encryption = __esm({
   "src/lib/encryption.ts"() {
     "use strict";
-    secretSeed = process.env.ENCRYPTION_SECRET || process.env.ADMIN_MASTER_PASSWORD || process.env.SESSION_SECRET || "airnet-computers-gmail-oauth-master-encryption-key-2026";
-    key = crypto2.createHash("sha256").update(secretSeed).digest();
+    PRIMARY_SEED = process.env.ENCRYPTION_SECRET || "airnet-computers-gmail-oauth-master-encryption-key-2026";
+    key = crypto2.createHash("sha256").update(PRIMARY_SEED).digest();
+    CANDIDATE_SEEDS = [
+      PRIMARY_SEED,
+      process.env.ADMIN_MASTER_PASSWORD,
+      process.env.SESSION_SECRET,
+      "airnet",
+      "rasool",
+      "8792900246"
+    ].filter((s) => Boolean(s && s.trim()));
   }
 });
 
@@ -55957,6 +55974,9 @@ async function handleOAuthCallback(code, origin) {
     const errData = await tokenRes.json().catch(() => ({}));
     const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
     console.error("[gmail-oauth] Token exchange failed:", errData);
+    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
+      throw new Error(`Google token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Settings.`);
+    }
     throw new Error(`Google token exchange failed: ${errorMsg}`);
   }
   const tokenData = await tokenRes.json();
@@ -56150,11 +56170,22 @@ async function saveGmailAppCredentials(clientId, clientSecret) {
   if (!cId || !cSec) {
     throw new Error("Both Client ID and Client Secret are required");
   }
+  const encrypted = encrypt(cSec);
   await db.update(reportSettingsTable).set({
     gmailClientId: cId,
-    gmailClientSecretEncrypted: encrypt(cSec),
+    gmailClientSecretEncrypted: encrypted,
     updatedAt: /* @__PURE__ */ new Date()
   }).where(eq(reportSettingsTable.id, "daily_report"));
+  try {
+    const { googleDriveSettingsTable: googleDriveSettingsTable3 } = await Promise.resolve().then(() => (init_src(), src_exports));
+    await db.update(googleDriveSettingsTable3).set({
+      googleClientId: cId,
+      googleClientSecretEncrypted: encrypted,
+      updatedAt: /* @__PURE__ */ new Date()
+    });
+  } catch (err) {
+    console.warn("[gmail-oauth] Syncing client secret to google_drive_settings skipped:", err.message);
+  }
   return { success: true, message: "Google OAuth credentials saved securely" };
 }
 async function getGmailIntegrationStatus() {
@@ -58034,11 +58065,21 @@ async function getStoredDriveCredentials() {
 }
 async function updateDriveClientCredentials(clientId, clientSecret) {
   await ensureDriveTables();
+  const encrypted = encrypt(clientSecret.trim());
   await db.update(googleDriveSettingsTable).set({
     googleClientId: clientId.trim(),
-    googleClientSecretEncrypted: encrypt(clientSecret.trim()),
+    googleClientSecretEncrypted: encrypted,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq(googleDriveSettingsTable.id, "drive_config"));
+  });
+  try {
+    await db.update(reportSettingsTable).set({
+      gmailClientId: clientId.trim(),
+      gmailClientSecretEncrypted: encrypted,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(reportSettingsTable.id, "daily_report"));
+  } catch (err) {
+    console.warn("[google-drive-service] Syncing client secret to report_settings skipped:", err.message);
+  }
 }
 function getDriveRedirectUri(customOrigin) {
   if (process.env.GOOGLE_DRIVE_REDIRECT_URI && !process.env.GOOGLE_DRIVE_REDIRECT_URI.includes("your-app-name")) {
@@ -58120,6 +58161,9 @@ async function handleDriveOAuthCallback(code, origin) {
     const errData = await tokenRes.json().catch(() => ({}));
     const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
     console.error("[google-drive-service] Token exchange failed:", errData);
+    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
+      throw new Error(`Google Drive token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Google Drive Settings.`);
+    }
     throw new Error(`Google Drive token exchange failed: ${errorMsg}`);
   }
   const tokenData = await tokenRes.json();

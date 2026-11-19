@@ -169,10 +169,9 @@ export default function DailyReports() {
 
   // Gmail API OAuth Modal & Action states
   const DEFAULT_GMAIL_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
-  const DEFAULT_GMAIL_CLIENT_SECRET = "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";
   const [showGmailModal, setShowGmailModal] = useState(false);
   const [gmailClientIdInput, setGmailClientIdInput] = useState(DEFAULT_GMAIL_CLIENT_ID);
-  const [gmailClientSecretInput, setGmailClientSecretInput] = useState(DEFAULT_GMAIL_CLIENT_SECRET);
+  const [gmailClientSecretInput, setGmailClientSecretInput] = useState("");
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [savingGmailCreds, setSavingGmailCreds] = useState(false);
   const [isConnectingGmail, setIsConnectingGmail] = useState(false);
@@ -260,7 +259,6 @@ export default function DailyReports() {
         } else {
           setGmailClientIdInput(DEFAULT_GMAIL_CLIENT_ID);
         }
-        setGmailClientSecretInput(DEFAULT_GMAIL_CLIENT_SECRET);
       }
     } catch (err) {
       console.error("Error fetching report settings:", err);
@@ -1697,9 +1695,14 @@ export default function DailyReports() {
                     <label className="text-xs font-bold text-gray-700">
                       Google OAuth Client Secret
                     </label>
-                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                      <Lock className="w-3 h-3" /> Encrypted with AES-256-GCM
-                    </span>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials?project=438450701267"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-blue-600 hover:underline font-medium"
+                    >
+                      Find / Reset Secret in GCP ↗
+                    </a>
                   </div>
                   <div className="relative">
                     <input
@@ -1707,7 +1710,7 @@ export default function DailyReports() {
                       required
                       value={gmailClientSecretInput}
                       onChange={(e) => setGmailClientSecretInput(e.target.value)}
-                      placeholder="GOCSPX-••••••••••••••••••••••••"
+                      placeholder="Paste active Client Secret from Google Cloud Console (GOCSPX-...)"
                       className="w-full px-3 pr-10 py-2 text-xs border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 font-mono"
                     />
                     <button

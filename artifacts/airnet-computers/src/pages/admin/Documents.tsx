@@ -142,9 +142,10 @@ export default function Documents() {
   const [inlineAckValue, setInlineAckValue] = useState<string>("");
   const [isSavingInlineAck, setIsSavingInlineAck] = useState<boolean>(false);
 
+  const DEFAULT_DRIVE_CLIENT_ID = "438450701267-huqvap7ji7qtg64ijgu2no0amca4n47g.apps.googleusercontent.com";
   // Drive Settings Form State
   const [driveCredentials, setDriveCredentials] = useState({
-    clientId: "",
+    clientId: DEFAULT_DRIVE_CLIENT_ID,
     clientSecret: "",
   });
   const [isSavingCredentials, setIsSavingCredentials] = useState(false);
@@ -293,6 +294,15 @@ export default function Documents() {
   // Connect Google Drive OAuth flow
   const handleConnectDrive = async () => {
     try {
+      // If user provided credentials in the settings modal, save them first before initiating OAuth
+      if (driveCredentials.clientId && driveCredentials.clientSecret) {
+        await fetch("/api/admin/google-drive/credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(driveCredentials),
+        });
+      }
+
       const originParam = typeof window !== "undefined" ? window.location.origin : "http://localhost:5000";
       const res = await fetch(`/api/admin/google-drive/auth?origin=${encodeURIComponent(originParam)}`);
       const data = await res.json();
@@ -1830,6 +1840,15 @@ export default function Documents() {
                     <span className="font-semibold text-blue-700">Verified on Drive</span>
                   </div>
                 )}
+                {driveStatus?.lastError && (
+                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-lg text-rose-800 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-rose-900 text-[11px]">
+                      <AlertCircle size={13} className="text-rose-600 shrink-0" />
+                      <span>Google Error Notice:</span>
+                    </div>
+                    <div className="text-[10px] leading-relaxed break-words">{driveStatus.lastError}</div>
+                  </div>
+                )}
               </div>
 
               {/* Folder Architecture Info */}
@@ -1890,16 +1909,29 @@ export default function Documents() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
-                    Client Secret
-                  </label>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[11px] font-bold text-slate-600">
+                      Client Secret
+                    </label>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials?project=438450701267"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-blue-600 hover:underline font-medium"
+                    >
+                      Find / Reset Secret in GCP ↗
+                    </a>
+                  </div>
                   <input
                     type="password"
-                    placeholder="Enter Google Cloud Client Secret"
+                    placeholder="Enter or paste active Google Cloud Client Secret (e.g. GOCSPX-...)"
                     value={driveCredentials.clientSecret}
                     onChange={(e) => setDriveCredentials({ ...driveCredentials, clientSecret: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Copy the Client Secret directly from Google Cloud Console &gt; Credentials &gt; OAuth 2.0 Web Client.
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between pt-2">

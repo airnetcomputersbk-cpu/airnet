@@ -210,14 +210,28 @@ export async function getStoredDriveCredentials() {
  */
 export async function updateDriveClientCredentials(clientId: string, clientSecret: string) {
   await ensureDriveTables();
+  const encrypted = encrypt(clientSecret.trim());
+  // Update all config rows in googleDriveSettingsTable (both drive_config and drive_settings)
   await db
     .update(googleDriveSettingsTable)
     .set({
       googleClientId: clientId.trim(),
-      googleClientSecretEncrypted: encrypt(clientSecret.trim()),
+      googleClientSecretEncrypted: encrypted,
       updatedAt: new Date(),
-    })
-    .where(eq(googleDriveSettingsTable.id, "drive_config"));
+    });
+
+  try {
+    await db
+      .update(reportSettingsTable)
+      .set({
+        gmailClientId: clientId.trim(),
+        gmailClientSecretEncrypted: encrypted,
+        updatedAt: new Date(),
+      })
+      .where(eq(reportSettingsTable.id, "daily_report"));
+  } catch (err: any) {
+    console.warn("[google-drive-service] Syncing client secret to report_settings skipped:", err.message);
+  }
 }
 
 /**
@@ -331,6 +345,9 @@ export async function handleDriveOAuthCallback(
     const errData: any = await tokenRes.json().catch(() => ({}));
     const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
     console.error("[google-drive-service] Token exchange failed:", errData);
+    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
+      throw new Error(`Google Drive token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Google Drive Settings.`);
+    }
     throw new Error(`Google Drive token exchange failed: ${errorMsg}`);
   }
 

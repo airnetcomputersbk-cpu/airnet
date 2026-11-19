@@ -158,6 +158,9 @@ export async function handleOAuthCallback(code: string, origin?: string): Promis
     const errData: any = await tokenRes.json().catch(() => ({}));
     const errorMsg = errData.error_description || errData.error || `HTTP ${tokenRes.status}`;
     console.error("[gmail-oauth] Token exchange failed:", errData);
+    if (errorMsg.toLowerCase().includes("client secret") || errData.error === "invalid_client") {
+      throw new Error(`Google token exchange failed: The provided client secret is invalid. Please copy the active Client Secret from Google Cloud Console (APIs & Services > Credentials > OAuth 2.0 Web Client) and save it in Settings.`);
+    }
     throw new Error(`Google token exchange failed: ${errorMsg}`);
   }
 
@@ -436,14 +439,28 @@ export async function saveGmailAppCredentials(
     throw new Error("Both Client ID and Client Secret are required");
   }
 
+  const encrypted = encrypt(cSec);
   await db
     .update(reportSettingsTable)
     .set({
       gmailClientId: cId,
-      gmailClientSecretEncrypted: encrypt(cSec),
+      gmailClientSecretEncrypted: encrypted,
       updatedAt: new Date(),
     })
     .where(eq(reportSettingsTable.id, "daily_report"));
+
+  try {
+    const { googleDriveSettingsTable } = await import("@workspace/db");
+    await db
+      .update(googleDriveSettingsTable)
+      .set({
+        googleClientId: cId,
+        googleClientSecretEncrypted: encrypted,
+        updatedAt: new Date(),
+      });
+  } catch (err: any) {
+    console.warn("[gmail-oauth] Syncing client secret to google_drive_settings skipped:", err.message);
+  }
 
   return { success: true, message: "Google OAuth credentials saved securely" };
 }

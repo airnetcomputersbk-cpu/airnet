@@ -1,13 +1,21 @@
 import crypto from "crypto";
 
-// Derive 32-byte key using SHA-256 from backend secret
-const secretSeed =
+// Stable canonical encryption seed across all environments (local, Vercel, VM)
+const PRIMARY_SEED =
   process.env.ENCRYPTION_SECRET ||
-  process.env.ADMIN_MASTER_PASSWORD ||
-  process.env.SESSION_SECRET ||
   "airnet-computers-gmail-oauth-master-encryption-key-2026";
 
-const key = crypto.createHash("sha256").update(secretSeed).digest();
+const key = crypto.createHash("sha256").update(PRIMARY_SEED).digest();
+
+// Candidate seeds for backward compatibility with previously encrypted database values
+const CANDIDATE_SEEDS = [
+  PRIMARY_SEED,
+  process.env.ADMIN_MASTER_PASSWORD,
+  process.env.SESSION_SECRET,
+  "airnet",
+  "rasool",
+  "8792900246",
+].filter((s): s is string => Boolean(s && s.trim()));
 
 /**
  * Encrypt plain text using authenticated AES-256-GCM.
@@ -29,7 +37,7 @@ export function encrypt(text: string): string {
 
 /**
  * Decrypt ciphertext using authenticated AES-256-GCM.
- * Validates integrity via GCM auth tag.
+ * Validates integrity via GCM auth tag, trying candidate keys for resilience.
  */
 export function decrypt(ciphertext?: string | null): string {
   if (!ciphertext) return "";
@@ -43,9 +51,20 @@ export function decrypt(ciphertext?: string | null): string {
     const tag = Buffer.from(parts[1], "hex");
     const encrypted = Buffer.from(parts[2], "hex");
 
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(encrypted) + decipher.final("utf8");
+    for (const seed of CANDIDATE_SEEDS) {
+      try {
+        const candidateKey = crypto.createHash("sha256").update(seed).digest();
+        const decipher = crypto.createDecipheriv("aes-256-gcm", candidateKey, iv);
+        decipher.setAuthTag(tag);
+        const decrypted = decipher.update(encrypted) + decipher.final("utf8");
+        return decrypted;
+      } catch {
+        // Try next candidate seed
+      }
+    }
+
+    console.error("[encryption] Failed to decrypt ciphertext with any known key");
+    return "";
   } catch (err) {
     console.error("[encryption] Failed to decrypt:", err);
     return "";
