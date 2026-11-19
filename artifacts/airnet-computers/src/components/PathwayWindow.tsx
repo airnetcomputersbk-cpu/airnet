@@ -176,33 +176,37 @@ export default function PathwayWindow() {
     hour12: true
   });
 
-  // Dragging state
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({
-    startX: 0,
-    startY: 0,
-    posX: 0,
-    posY: 0,
-  });
+  // Window DOM element refs for ultra-smooth direct hardware-accelerated manipulation
+  const normalWindowRef = useRef<HTMLDivElement>(null);
+  const minimizedWindowRef = useRef<HTMLDivElement>(null);
 
-  // Resizing state
+  // Position and Size tracking refs (avoids re-rendering huge tree 120 times/sec during drags)
+  const currentPosRef = useRef({ x: windowPosition.x, y: windowPosition.y });
+  useEffect(() => {
+    currentPosRef.current = windowPosition;
+  }, [windowPosition]);
+
+  const currentSizeRef = useRef(windowSize);
+  useEffect(() => {
+    currentSizeRef.current = windowSize;
+  }, [windowSize]);
+
+  const currentMinSizeRef = useRef(minimizedSize);
+  useEffect(() => {
+    currentMinSizeRef.current = minimizedSize;
+  }, [minimizedSize]);
+
+  // Programmatic animation flag (enables smooth slide transitions ONLY on buttons like Switch Side)
+  const [isProgrammaticMove, setIsProgrammaticMove] = useState(false);
+
+  // Dragging and Resizing UI states
+  const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  const dragRafId = useRef<number | null>(null);
+
   const [isResizing, setIsResizing] = useState(false);
-  const resizeDirRef = useRef<ResizeDirection>("se");
-  const resizeStartRef = useRef<{
-    startX: number;
-    startY: number;
-    posX: number;
-    posY: number;
-    width: number;
-    height: number;
-  }>({
-    startX: 0,
-    startY: 0,
-    posX: 0,
-    posY: 0,
-    width: 0,
-    height: 0,
-  });
+  const isResizingRef = useRef(false);
+  const resizeRafId = useRef<number | null>(null);
 
   const handleCopy = (text: string, field: string) => {
     if (!text) return;
@@ -211,14 +215,22 @@ export default function PathwayWindow() {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  // Programmatic Switch Side (Slides smoothly across the screen)
+  const handleSwitchSide = () => {
+    setIsProgrammaticMove(true);
+    switchSide();
+    setTimeout(() => setIsProgrammaticMove(false), 320);
+  };
+
   // Full Screen Height Snap / Toggle (Allows screen to move upward until full height of screen)
   const [isFullHeight, setIsFullHeight] = useState(false);
   const prevHeightRef = useRef<{ y: number; height: number }>({ y: 0, height: 640 });
 
   const toggleFullHeight = () => {
     if (isLocked || isMaximized) return;
+    setIsProgrammaticMove(true);
     if (!isFullHeight) {
-      prevHeightRef.current = { y: windowPosition.y, height: windowSize.height };
+      prevHeightRef.current = { y: currentPosRef.current.y, height: currentSizeRef.current.height };
       setWindowPosition((prev) => ({ ...prev, y: 0 }));
       setWindowSize((prev) => ({ ...prev, height: window.innerHeight }));
       setIsFullHeight(true);
@@ -227,163 +239,250 @@ export default function PathwayWindow() {
       setWindowSize((prev) => ({ ...prev, height: prevHeightRef.current.height }));
       setIsFullHeight(false);
     }
+    setTimeout(() => setIsProgrammaticMove(false), 320);
   };
 
-  // Dedicated Title Bar Drag Handler
+  // High-Performance Hardware-Accelerated Title Bar Drag Handler (Global Listeners + rAF)
   const handlePointerDownDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isMaximized || isLocked) return; // Cannot drag when maximized or LOCKED!
+    if (isMaximized || isLocked) return;
+    if (e.button !== 0) return; // Only primary mouse button / touch
     const target = e.target as HTMLElement;
-    // Strictly prevent dragging when interacting with buttons, inputs, links, or form controls
+    // Strictly prevent dragging when clicking buttons, inputs, links, or form controls
     if (target.closest("button, input, select, textarea, a, [data-no-drag]")) {
       return;
     }
+
+    e.preventDefault();
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialX = currentPosRef.current.x;
+    const initialY = currentPosRef.current.y;
+    const curW = isMinimized ? currentMinSizeRef.current.width : currentSizeRef.current.width;
+    const curH = isMinimized ? currentMinSizeRef.current.height : currentSizeRef.current.height;
+
+    isDraggingRef.current = true;
     setIsDragging(true);
-    dragStartRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      posX: windowPosition.x,
-      posY: windowPosition.y,
-    };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
 
-  const handlePointerMoveDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || isLocked) return;
-    const dx = e.clientX - dragStartRef.current.startX;
-    const dy = e.clientY - dragStartRef.current.startY;
-
-    const curW = isMinimized ? minimizedSize.width : windowSize.width;
-    const curH = isMinimized ? minimizedSize.height : windowSize.height;
-
-    // Boundary constraints: allow moving upward all the way to 0 (full monitor top)
-    const maxX = Math.max(0, window.innerWidth - curW);
-    const maxY = Math.max(0, window.innerHeight - curH);
-
-    const nextX = Math.max(0, Math.min(maxX, dragStartRef.current.posX + dx));
-    const nextY = Math.max(0, Math.min(maxY, dragStartRef.current.posY + dy));
-
-    setWindowPosition({ x: nextX, y: nextY });
-  };
-
-  const handlePointerUpDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isDragging) {
-      setIsDragging(false);
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {}
+    const activeEl = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+    if (activeEl) {
+      activeEl.style.transition = "none";
+      activeEl.style.willChange = "left, top";
     }
+    document.body.style.userSelect = "none";
+
+    let lastX = initialX;
+    let lastY = initialY;
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const dx = moveEv.clientX - startX;
+      const dy = moveEv.clientY - startY;
+
+      const maxX = Math.max(0, window.innerWidth - curW);
+      const maxY = Math.max(0, window.innerHeight - curH);
+
+      let nextX = Math.max(0, Math.min(maxX, initialX + dx));
+      let nextY = Math.max(0, Math.min(maxY, initialY + dy));
+
+      // Gentle edge magnetic snapping for clean alignment
+      if (settings.snapToEdges) {
+        if (nextX < 14) nextX = 0;
+        else if (nextX > maxX - 14) nextX = maxX;
+
+        if (nextY < 14) nextY = 0;
+        else if (nextY > maxY - 14) nextY = maxY;
+      }
+
+      lastX = nextX;
+      lastY = nextY;
+      currentPosRef.current = { x: nextX, y: nextY };
+
+      if (dragRafId.current !== null) {
+        cancelAnimationFrame(dragRafId.current);
+      }
+      dragRafId.current = requestAnimationFrame(() => {
+        const el = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+        if (el) {
+          el.style.left = `${lastX}px`;
+          el.style.top = `${lastY}px`;
+        }
+      });
+    };
+
+    const onPointerUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+
+      if (dragRafId.current !== null) {
+        cancelAnimationFrame(dragRafId.current);
+        dragRafId.current = null;
+      }
+
+      document.body.style.userSelect = "";
+
+      const el = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+      if (el) {
+        el.style.willChange = "auto";
+        el.style.transition = "none";
+        el.style.left = `${lastX}px`;
+        el.style.top = `${lastY}px`;
+      }
+
+      // Commit final position to React state and localStorage ONCE (Rock-solid, zero vibration)
+      setWindowPosition({ x: lastX, y: lastY });
+      setIsDragging(false);
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
-  // Multi-Directional Window Resizing Handlers (North, South, East, West and all 4 Corners)
+  // High-Performance Multi-Directional Window Resizing Handler (Global Listeners + rAF)
   const handlePointerDownResize = (e: React.PointerEvent<HTMLDivElement>, direction: ResizeDirection) => {
-    if (isLocked || isMaximized) return; // Cannot resize when locked or maximized!
+    if (isLocked || isMaximized) return;
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
-    setIsResizing(true);
-    resizeDirRef.current = direction;
 
-    const currentW = isMinimized ? minimizedSize.width : windowSize.width;
-    const currentH = isMinimized ? minimizedSize.height : windowSize.height;
-
-    resizeStartRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      posX: windowPosition.x,
-      posY: windowPosition.y,
-      width: currentW,
-      height: currentH,
-    };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const handlePointerMoveResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isResizing || isLocked) return;
-    const dx = e.clientX - resizeStartRef.current.startX;
-    const dy = e.clientY - resizeStartRef.current.startY;
-    const dir = resizeDirRef.current;
-
-    const origX = resizeStartRef.current.posX;
-    const origY = resizeStartRef.current.posY;
-    const origW = resizeStartRef.current.width;
-    const origH = resizeStartRef.current.height;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = currentPosRef.current.x;
+    const origY = currentPosRef.current.y;
+    const origW = isMinimized ? currentMinSizeRef.current.width : currentSizeRef.current.width;
+    const origH = isMinimized ? currentMinSizeRef.current.height : currentSizeRef.current.height;
 
     const minW = isMinimized ? 280 : 380;
     const minH = isMinimized ? 52 : 300;
     const maxW = isMinimized ? 760 : Math.max(minW, window.innerWidth);
     const maxH = isMinimized ? 220 : Math.max(minH, window.innerHeight);
 
-    let nextX = origX;
-    let nextY = origY;
-    let nextW = origW;
-    let nextH = origH;
+    isResizingRef.current = true;
+    setIsResizing(true);
 
-    // Horizontal stretch
-    if (dir.includes("e")) {
-      // East (Right border)
-      const proposedW = origW + dx;
-      const boundMaxW = window.innerWidth - origX;
-      nextW = Math.max(minW, Math.min(boundMaxW, proposedW));
-    } else if (dir.includes("w")) {
-      // West (Left border)
-      const proposedW = origW - dx;
-      if (proposedW < minW) {
-        nextW = minW;
-        nextX = origX + (origW - minW);
-      } else if (origX + dx <= 0) {
-        nextX = 0;
-        nextW = Math.min(maxW, origX + origW);
+    const activeEl = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+    if (activeEl) {
+      activeEl.style.transition = "none";
+      activeEl.style.willChange = "width, height, left, top";
+    }
+    document.body.style.userSelect = "none";
+
+    let finalX = origX;
+    let finalY = origY;
+    let finalW = origW;
+    let finalH = origH;
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      if (!isResizingRef.current) return;
+      const dx = moveEv.clientX - startX;
+      const dy = moveEv.clientY - startY;
+
+      let nextX = origX;
+      let nextY = origY;
+      let nextW = origW;
+      let nextH = origH;
+
+      // Horizontal stretch
+      if (direction.includes("e")) {
+        const proposedW = origW + dx;
+        const boundMaxW = window.innerWidth - origX;
+        nextW = Math.max(minW, Math.min(boundMaxW, proposedW));
+      } else if (direction.includes("w")) {
+        const proposedW = origW - dx;
+        if (proposedW < minW) {
+          nextW = minW;
+          nextX = origX + (origW - minW);
+        } else if (origX + dx <= 0) {
+          nextX = 0;
+          nextW = Math.min(maxW, origX + origW);
+        } else {
+          nextW = Math.min(maxW, proposedW);
+          nextX = origX + (origW - nextW);
+        }
+      }
+
+      // Vertical stretch
+      if (direction.includes("s")) {
+        const proposedH = origH + dy;
+        const boundMaxH = window.innerHeight - origY;
+        nextH = Math.max(minH, Math.min(boundMaxH, proposedH));
+      } else if (direction.includes("n")) {
+        const proposedH = origH - dy;
+        if (origY + dy <= 0) {
+          nextY = 0;
+          nextH = Math.min(window.innerHeight, origY + origH);
+        } else if (proposedH < minH) {
+          nextH = minH;
+          nextY = origY + (origH - minH);
+        } else {
+          nextH = Math.min(window.innerHeight, proposedH);
+          nextY = Math.max(0, origY + (origH - nextH));
+        }
+      }
+
+      nextX = Math.max(0, Math.min(window.innerWidth - nextW, nextX));
+      nextY = Math.max(0, Math.min(window.innerHeight - nextH, nextY));
+
+      finalX = nextX;
+      finalY = nextY;
+      finalW = nextW;
+      finalH = nextH;
+      currentPosRef.current = { x: nextX, y: nextY };
+
+      if (resizeRafId.current !== null) {
+        cancelAnimationFrame(resizeRafId.current);
+      }
+      resizeRafId.current = requestAnimationFrame(() => {
+        const el = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+        if (el) {
+          el.style.width = `${nextW}px`;
+          el.style.height = `${nextH}px`;
+          el.style.left = `${nextX}px`;
+          el.style.top = `${nextY}px`;
+        }
+      });
+    };
+
+    const onPointerUp = () => {
+      isResizingRef.current = false;
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+
+      if (resizeRafId.current !== null) {
+        cancelAnimationFrame(resizeRafId.current);
+        resizeRafId.current = null;
+      }
+
+      document.body.style.userSelect = "";
+
+      const el = isMinimized ? minimizedWindowRef.current : normalWindowRef.current;
+      if (el) {
+        el.style.willChange = "auto";
+        el.style.transition = "none";
+        el.style.width = `${finalW}px`;
+        el.style.height = `${finalH}px`;
+        el.style.left = `${finalX}px`;
+        el.style.top = `${finalY}px`;
+      }
+
+      if (isMinimized) {
+        setMinimizedSize({ width: finalW, height: finalH });
       } else {
-        nextW = Math.min(maxW, proposedW);
-        nextX = origX + (origW - nextW);
+        setWindowSize({ width: finalW, height: finalH });
       }
-    }
-
-    // Vertical stretch - moves upward until the full height of the screen!
-    if (dir.includes("s")) {
-      // South (Bottom border)
-      const proposedH = origH + dy;
-      const boundMaxH = window.innerHeight - origY;
-      nextH = Math.max(minH, Math.min(boundMaxH, proposedH));
-    } else if (dir.includes("n")) {
-      // North (Top border) - stretching upward all the way to top of screen!
-      const proposedH = origH - dy;
-      if (origY + dy <= 0) {
-        // Touches top of monitor (y = 0), expand upward until full screen height!
-        nextY = 0;
-        nextH = Math.min(window.innerHeight, origY + origH);
-      } else if (proposedH < minH) {
-        nextH = minH;
-        nextY = origY + (origH - minH);
-      } else {
-        nextH = Math.min(window.innerHeight, proposedH);
-        nextY = Math.max(0, origY + (origH - nextH));
+      if (direction.includes("w") || direction.includes("n")) {
+        setWindowPosition({ x: finalX, y: finalY });
       }
-    }
-
-    // Boundary constraints clamp
-    nextX = Math.max(0, Math.min(window.innerWidth - nextW, nextX));
-    nextY = Math.max(0, Math.min(window.innerHeight - nextH, nextY));
-
-    if (isMinimized) {
-      setMinimizedSize({ width: nextW, height: nextH });
-      if (dir.includes("w") || dir.includes("n")) {
-        setWindowPosition({ x: nextX, y: nextY });
-      }
-    } else {
-      setWindowSize({ width: nextW, height: nextH });
-      if (dir.includes("w") || dir.includes("n")) {
-        setWindowPosition({ x: nextX, y: nextY });
-      }
-    }
-  };
-
-  const handlePointerUpResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (isResizing) {
       setIsResizing(false);
-      try {
-        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-      } catch {}
-    }
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
   if (pipWindow && pipContainer) {
@@ -448,6 +547,7 @@ export default function PathwayWindow() {
   if (isMinimized) {
     return (
       <div
+        ref={minimizedWindowRef}
         style={{
           position: "fixed",
           left: `${windowPosition.x}px`,
@@ -455,10 +555,11 @@ export default function PathwayWindow() {
           width: `${minimizedSize.width}px`,
           height: `${minimizedSize.height}px`,
           zIndex: 9999,
-          transition:
-            isDragging || isResizing
-              ? "none"
-              : "left 0.25s cubic-bezier(0.16, 1, 0.3, 1), top 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.2s ease, height 0.2s ease",
+          transition: isProgrammaticMove
+            ? "left 0.25s cubic-bezier(0.16, 1, 0.3, 1), top 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.2s ease, height 0.2s ease"
+            : isResizing
+            ? "none"
+            : "width 0.2s ease, height 0.2s ease",
         }}
         className={`group select-none bg-[#032e60]/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border flex flex-col justify-between p-2.5 transition-shadow hover:shadow-cyan-500/20 ${
           isLocked ? "border-amber-400/50 shadow-amber-500/10" : "border-blue-400/40"
@@ -469,57 +570,41 @@ export default function PathwayWindow() {
           <>
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "n")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -top-1 left-2 right-2 h-2 cursor-ns-resize z-50 hover:bg-cyan-500/30"
               title="Resize Height (Top)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "s")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -bottom-1 left-2 right-2 h-2 cursor-ns-resize z-50 hover:bg-cyan-500/30"
               title="Resize Height (Bottom)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "w")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -left-1 top-2 bottom-2 w-2 cursor-ew-resize z-50 hover:bg-cyan-500/30"
               title="Resize Width (Left)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "e")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -right-1 top-2 bottom-2 w-2 cursor-ew-resize z-50 hover:bg-cyan-500/30"
               title="Resize Width (Right)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "nw")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -top-1 -left-1 w-3 h-3 cursor-nwse-resize z-50 hover:bg-cyan-500/40"
               title="Resize Corner (Top-Left)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "ne")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -top-1 -right-1 w-3 h-3 cursor-nesw-resize z-50 hover:bg-cyan-500/40"
               title="Resize Corner (Top-Right)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "sw")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -bottom-1 -left-1 w-3 h-3 cursor-nesw-resize z-50 hover:bg-cyan-500/40"
               title="Resize Corner (Bottom-Left)"
             />
             <div
               onPointerDown={(e) => handlePointerDownResize(e, "se")}
-              onPointerMove={handlePointerMoveResize}
-              onPointerUp={handlePointerUpResize}
               className="absolute -bottom-1 -right-1 w-3.5 h-3.5 cursor-nwse-resize z-50 flex items-end justify-end p-0.5 text-cyan-300/70 hover:text-cyan-200"
               title="Resize Corner (Bottom-Right)"
             >
@@ -535,8 +620,6 @@ export default function PathwayWindow() {
         {/* Title bar drag area */}
         <div
           onPointerDown={handlePointerDownDrag}
-          onPointerMove={handlePointerMoveDrag}
-          onPointerUp={handlePointerUpDrag}
           className={`flex items-center justify-between gap-2 h-full ${
             isLocked ? "cursor-default" : isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
@@ -590,7 +673,7 @@ export default function PathwayWindow() {
             {/* Switch Side Button (Left ↔ Right) */}
             <button
               type="button"
-              onClick={switchSide}
+              onClick={handleSwitchSide}
               className="p-1.5 text-cyan-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
               title="Switch Side (Move Left ↔ Right)"
             >
@@ -657,7 +740,7 @@ export default function PathwayWindow() {
         width: "calc(100vw - 20px)",
         height: "calc(100vh - 20px)",
         zIndex: 9999,
-        transition: "all 0.2s ease",
+        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
       }
     : {
         position: "fixed",
@@ -666,14 +749,16 @@ export default function PathwayWindow() {
         width: `${windowSize.width}px`,
         height: `${windowSize.height}px`,
         zIndex: 9999,
-        transition:
-          isDragging || isResizing
-            ? "none"
-            : "left 0.25s cubic-bezier(0.16, 1, 0.3, 1), top 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.2s ease, height 0.2s ease",
+        transition: isProgrammaticMove
+          ? "left 0.25s cubic-bezier(0.16, 1, 0.3, 1), top 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.2s ease, height 0.2s ease"
+          : isResizing
+          ? "none"
+          : "width 0.2s ease, height 0.2s ease",
       };
 
   return (
     <div
+      ref={normalWindowRef}
       style={windowStyles}
       className={`flex flex-col bg-white rounded-2xl shadow-2xl border text-slate-800 overflow-hidden font-sans select-none backdrop-blur-xl relative ${
         isLocked
@@ -689,64 +774,48 @@ export default function PathwayWindow() {
           {/* North (Top edge) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "n")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -top-1.5 left-3 right-3 h-3.5 cursor-ns-resize z-50 hover:bg-cyan-500/30 active:bg-cyan-500/60 transition-colors"
             title="Stretch window upward"
           />
           {/* South (Bottom edge) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "s")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -bottom-1.5 left-3 right-3 h-3.5 cursor-ns-resize z-50 hover:bg-cyan-500/30 active:bg-cyan-500/60 transition-colors"
             title="Stretch window downward"
           />
           {/* West (Left edge) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "w")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -left-1.5 top-3 bottom-3 w-3.5 cursor-ew-resize z-50 hover:bg-cyan-500/30 active:bg-cyan-500/60 transition-colors"
             title="Stretch window leftward"
           />
           {/* East (Right edge) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "e")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -right-1.5 top-3 bottom-3 w-3.5 cursor-ew-resize z-50 hover:bg-cyan-500/30 active:bg-cyan-500/60 transition-colors"
             title="Stretch window rightward"
           />
           {/* North-West (Top-Left corner) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "nw")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -top-2 -left-2 w-5 h-5 cursor-nwse-resize z-50 hover:bg-cyan-500/40 active:bg-cyan-500/70 transition-colors rounded-tl"
             title="Stretch diagonally (Top-Left)"
           />
           {/* North-East (Top-Right corner) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "ne")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -top-2 -right-2 w-5 h-5 cursor-nesw-resize z-50 hover:bg-cyan-500/40 active:bg-cyan-500/70 transition-colors rounded-tr"
             title="Stretch diagonally (Top-Right)"
           />
           {/* South-West (Bottom-Left corner) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "sw")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -bottom-2 -left-2 w-5 h-5 cursor-nesw-resize z-50 hover:bg-cyan-500/40 active:bg-cyan-500/70 transition-colors rounded-bl"
             title="Stretch diagonally (Bottom-Left)"
           />
           {/* South-East (Bottom-Right corner) */}
           <div
             onPointerDown={(e) => handlePointerDownResize(e, "se")}
-            onPointerMove={handlePointerMoveResize}
-            onPointerUp={handlePointerUpResize}
             className="absolute -bottom-2 -right-2 w-5 h-5 cursor-nwse-resize z-50 hover:bg-cyan-500/40 active:bg-cyan-500/70 transition-colors rounded-br"
             title="Stretch diagonally (Bottom-Right)"
           />
@@ -758,8 +827,6 @@ export default function PathwayWindow() {
          ===================================================================== */}
       <div
         onPointerDown={handlePointerDownDrag}
-        onPointerMove={handlePointerMoveDrag}
-        onPointerUp={handlePointerUpDrag}
         onDoubleClick={toggleFullHeight}
         className={`bg-gradient-to-r from-[#022349] via-[#032e60] to-[#044085] text-white px-3.5 py-2.5 flex items-center justify-between border-b border-[#1e4b75] shrink-0 select-none ${
           isLocked || isMaximized ? "cursor-default" : "cursor-grab active:cursor-grabbing"
@@ -1158,7 +1225,7 @@ export default function PathwayWindow() {
           {/* Switch Side Button (Left ↔ Right Position) */}
           <button
             type="button"
-            onClick={switchSide}
+            onClick={handleSwitchSide}
             className="p-1.5 text-cyan-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
             title="Switch Side (Move Window Left ↔ Right)"
           >

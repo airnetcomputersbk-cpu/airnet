@@ -142,6 +142,7 @@ export function PathwayProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const currentTab = getTabKeyFromPath(location);
   const currentTabLabel = getTabLabel(currentTab);
+  const tabSessionId = useRef<string>(Math.random().toString(36).substring(2));
 
   // Lock Window Position & Resizing State across all pages / sessions
   const [isLocked, setIsLocked] = useState<boolean>(() => {
@@ -293,7 +294,12 @@ export function PathwayProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(`airnet_pathway_pos_${currentTab}`, JSON.stringify(windowPosition));
       }
       const channel = new BroadcastChannel("airnet_pathway_channel");
-      channel.postMessage({ type: "SYNC_POS", pos: windowPosition, tab: currentTab });
+      channel.postMessage({
+        type: "SYNC_POS",
+        pos: windowPosition,
+        tab: currentTab,
+        senderId: tabSessionId.current,
+      });
       channel.close();
     } catch {}
   }, [windowPosition, currentTab, settings.rememberPerTabPosition]);
@@ -345,9 +351,17 @@ export function PathwayProvider({ children }: { children: React.ReactNode }) {
         const data = event.data;
         if (!data) return;
 
+        // Ignore messages sent by our own tab session
+        if (data.senderId === tabSessionId.current) return;
+
         if (data.type === "SYNC_POS" && data.pos) {
           if (!settings.rememberPerTabPosition || data.tab === currentTab) {
-            setWindowPosition(data.pos);
+            setWindowPosition((prev) => {
+              if (Math.abs(prev.x - data.pos.x) < 1 && Math.abs(prev.y - data.pos.y) < 1) {
+                return prev;
+              }
+              return data.pos;
+            });
           }
         } else if (data.type === "SYNC_STATE") {
           if (data.isOpen !== undefined) setIsOpen(data.isOpen);
@@ -367,7 +381,12 @@ export function PathwayProvider({ children }: { children: React.ReactNode }) {
         if (e.key === `airnet_pathway_pos_${currentTab}` || e.key === "airnet_pathway_pos") {
           const parsed = JSON.parse(e.newValue);
           if (parsed && typeof parsed.x === "number" && typeof parsed.y === "number") {
-            setWindowPosition(parsed);
+            setWindowPosition((prev) => {
+              if (Math.abs(prev.x - parsed.x) < 1 && Math.abs(prev.y - parsed.y) < 1) {
+                return prev;
+              }
+              return parsed;
+            });
           }
         } else if (e.key === "airnet_pathway_open") {
           setIsOpen(e.newValue === "true");
@@ -387,7 +406,14 @@ export function PathwayProvider({ children }: { children: React.ReactNode }) {
             localStorage.getItem("airnet_pathway_pos");
           if (savedPos) {
             const parsed = JSON.parse(savedPos);
-            setWindowPosition(parsed);
+            if (parsed && typeof parsed.x === "number" && typeof parsed.y === "number") {
+              setWindowPosition((prev) => {
+                if (Math.abs(prev.x - parsed.x) < 1 && Math.abs(prev.y - parsed.y) < 1) {
+                  return prev;
+                }
+                return parsed;
+              });
+            }
           }
           const savedOpen = localStorage.getItem("airnet_pathway_open");
           if (savedOpen !== null) {
