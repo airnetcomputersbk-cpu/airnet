@@ -13,10 +13,38 @@ import { getFrontendDisplayedMobileNumber, CONSTANT_ADMIN_EMAIL } from "../lib/a
 import { getCache, setCache, invalidateCache } from "../lib/cache";
 import { broadcastEvent } from "../lib/events";
 import { resolveGovernmentServiceUrl } from "../lib/government-services-resolver";
+import { checkAndRunScheduledReport } from "../lib/daily-report-scheduler";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+
+// Automated Daily Report Cron Endpoint (Invoked by Vercel Cron at 17:30 UTC / 23:00 IST)
+router.get("/cron/daily-report", async (req, res) => {
+  try {
+    const isForced = req.query.force === "true" || req.query.force === "1";
+    const specificDate = typeof req.query.date === "string" ? req.query.date.trim() : undefined;
+    
+    // Optional bearer secret verification if CRON_SECRET is configured
+    if (process.env.CRON_SECRET) {
+      const authHeader = req.headers.authorization;
+      if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        res.status(401).json({ error: "Unauthorized cron execution request" });
+        return;
+      }
+    }
+
+    const outcome = await checkAndRunScheduledReport(isForced, specificDate);
+    res.json({
+      success: outcome.executed,
+      outcome,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error("[Cron] Daily report execution failed:", error);
+    res.status(500).json({ error: "Cron execution failed", details: error?.message || error });
+  }
+});
 
 router.post("/enquiries", async (req, res) => {
   try {

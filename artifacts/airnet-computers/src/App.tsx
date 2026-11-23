@@ -1530,7 +1530,7 @@ Your application enquiry has been saved and dispatched to Airnet Computers.
 Your Customer Reference ID: ${customerId}
 Applicant: ${customerName}
 Mobile Number: ${mobileNumber}
-Service: ${service}
+Service: ${service}.
 Status: ● Enquiry Received
 
 Airnet Computers (Md Amjad Ali) will review your enquiry in the Admin panel and call you on ${mobileNumber} to confirm documents and complete your application.
@@ -1560,21 +1560,10 @@ function SuccessModal({
   onTrack?: (query: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [copiedMsg, setCopiedMsg] = useState(false);
-  const [showFullMsg, setShowFullMsg] = useState(false);
-  const [messageDispatched, setMessageDispatched] = useState(false);
 
-  const rawMessage = useMemo(() => getRegistrationConfirmationMessage(application, helpline), [application, helpline]);
-  const cleanPhone = (application?.mobileNumber || "").replace(/\D/g, "").slice(-10);
-  const whatsappUrl = `https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(rawMessage)}`;
-  const smsUrl = `sms:+91${cleanPhone}?body=${encodeURIComponent(rawMessage)}`;
-
-  // Automatically dispatch confirmation message to customer upon displaying registration confirmation
+  // Notify backend notification system about new enquiry without opening external apps
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
     if (application?.customerId && application?.mobileNumber) {
-      // 1. Dispatch confirmation to backend notification system
       fetch("/api/enquiries/send-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1583,32 +1572,10 @@ function SuccessModal({
           customerName: application.customerName,
           mobileNumber: application.mobileNumber,
           serviceName: application.service,
-          message: rawMessage,
         }),
-      })
-        .then((res) => {
-          if (res.ok) {
-            setMessageDispatched(true);
-          }
-        })
-        .catch(console.error);
-
-      // 2. Automatically trigger WhatsApp message send to customer's mobile device
-      if (cleanPhone && cleanPhone.length === 10) {
-        timer = setTimeout(() => {
-          try {
-            window.open(whatsappUrl, "_blank");
-          } catch (e) {
-            console.log("Automatic popup was blocked by browser", e);
-          }
-        }, 500);
-      }
+      }).catch(console.error);
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [application?.customerId, application?.mobileNumber, rawMessage, cleanPhone, whatsappUrl]);
+  }, [application?.customerId, application?.mobileNumber, application?.customerName, application?.service]);
 
   const copyId = () => {
     if (application?.customerId) {
@@ -1618,11 +1585,11 @@ function SuccessModal({
     }
   };
 
-  const copyFullMessage = () => {
-    navigator.clipboard.writeText(rawMessage);
-    setCopiedMsg(true);
-    setTimeout(() => setCopiedMsg(false), 2000);
-  };
+  const customerId = application?.customerId || "AN-Pending";
+  const customerName = application?.customerName || "Customer";
+  const mobileNumber = application?.mobileNumber || "";
+  const service = application?.service || "Online Service";
+  const displayHelpline = helpline || "+91 7892881086";
 
   return (
     <div
@@ -1631,9 +1598,9 @@ function SuccessModal({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-panel relative my-auto w-full max-w-lg rounded-2xl sm:rounded-3xl border border-[#e1d7c6] bg-[#fcfaf5] text-left shadow-[0_24px_80px_rgba(3,46,96,.4)] max-h-[90vh] sm:max-h-[88vh] flex flex-col overflow-hidden">
-        {/* Sticky Header with Title and Clear Cancellation Button */}
-        <div className="p-5 sm:p-6 pb-3 sm:pb-4 bg-[#fcfaf5] border-b border-[#e8dfcf] flex items-start justify-between gap-3 shrink-0">
+      <div className="modal-panel relative my-auto w-full max-w-lg rounded-2xl sm:rounded-3xl border border-[#e1d7c6] bg-[#fcfaf5] text-left shadow-[0_24px_80px_rgba(3,46,96,.4)] max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="p-5 sm:p-6 pb-4 bg-[#fcfaf5] border-b border-[#e8dfcf] flex items-start justify-between gap-3 shrink-0">
           <div className="flex items-start gap-3 sm:gap-3.5 text-left flex-1 min-w-0">
             <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-[#dcebe5] shadow-2xs mt-0.5">
               <Check size={24} className="text-[#177d70]" />
@@ -1642,8 +1609,8 @@ function SuccessModal({
               <h2 className="font-display text-lg sm:text-2xl font-bold tracking-tight text-[#032e60] text-left">
                 Application Received!
               </h2>
-              <p className="mt-0.5 text-xs text-[#657276] text-left truncate">
-                Enquiry saved & dispatched to Airnet Computers.
+              <p className="mt-0.5 text-xs text-[#52616b] text-left">
+                Your application enquiry has been saved and dispatched to Airnet Computers.
               </p>
             </div>
           </div>
@@ -1658,130 +1625,89 @@ function SuccessModal({
           </button>
         </div>
 
-        {/* Scrollable Body with Visible Scrollbar */}
-        <div className="p-5 sm:p-7 overflow-y-auto flex-1 custom-scrollbar space-y-4">
-          {/* Automatic Message Dispatched Notification Banner */}
-          <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-300 p-4 text-left shadow-xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-                <span className="text-xs font-bold text-emerald-950">
-                  Automatic Customer Message Dispatched
-                </span>
-              </div>
-              <span className="text-[10px] bg-emerald-600 text-white px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
-                {messageDispatched ? "✓ Sent" : "Sending..."}
+        {/* Body Content */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+          {/* Customer Details Card */}
+          <div className="p-4 bg-[#f0f7f4] border border-[#b2d5cb] rounded-2xl text-left">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#177d70]">
+                Your Customer Reference ID
               </span>
-            </div>
-
-            <p className="mt-2 text-xs text-emerald-900 leading-normal">
-              Automatic confirmation with <strong>Customer ID ({application?.customerId})</strong>, <strong>Applicant ({application?.customerName})</strong>, and <strong>Service ({application?.service})</strong> is dispatched to <strong>+91 {application?.mobileNumber}</strong>.
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {cleanPhone && (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-bold rounded-xl transition-all shadow-xs transform active:scale-98"
-                  title="Open WhatsApp with confirmation message"
-                >
-                  <span>Send on WhatsApp</span>
-                  <Share2 size={13} />
-                </a>
-              )}
-              {cleanPhone && (
-                <a
-                  href={smsUrl}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl transition-colors"
-                  title="Send via SMS on phone"
-                >
-                  <span>SMS</span>
-                </a>
-              )}
               <button
                 type="button"
-                onClick={copyFullMessage}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                onClick={copyId}
+                className="text-[11px] font-bold text-[#032e60] hover:text-[#177d70] flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <Copy size={13} />
-                <span>{copiedMsg ? "Copied!" : "Copy Text"}</span>
+                <Copy size={12} />
+                {copied ? "Copied!" : "Copy ID"}
               </button>
             </div>
-
-            <div className="mt-2.5 pt-2 border-t border-emerald-200 flex justify-between items-center text-[11px]">
-              <button
-                type="button"
-                onClick={() => setShowFullMsg(!showFullMsg)}
-                className="font-bold text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
-              >
-                {showFullMsg ? "Hide message preview" : "View exact message text"}
-              </button>
-              <span className="text-emerald-700 text-[10px]">
-                Customer ID, Name & Service included
-              </span>
+            <div className="font-mono text-xl sm:text-2xl font-black text-[#032e60] tracking-wider">
+              {customerId}
             </div>
 
-            {showFullMsg && (
-              <div className="mt-2 p-3 bg-white border border-emerald-200 rounded-xl text-[11px] text-gray-800 whitespace-pre-wrap font-mono leading-relaxed select-all max-h-48 overflow-y-auto custom-scrollbar-emerald">
-                {rawMessage}
+            <div className="mt-3 pt-3 border-t border-[#d2e7df] space-y-2 text-left text-xs sm:text-[13px]">
+              <div className="flex items-baseline gap-2 text-left">
+                <span className="text-[#657276] font-semibold text-left shrink-0">Applicant:</span>
+                <span className="font-bold text-[#032e60] text-left">{customerName}</span>
               </div>
-            )}
+              <div className="flex items-baseline gap-2 text-left">
+                <span className="text-[#657276] font-semibold text-left shrink-0">Mobile Number:</span>
+                <span className="font-bold text-[#032e60] font-mono text-left">{mobileNumber}</span>
+              </div>
+              <div className="flex items-start gap-2 text-left">
+                <span className="text-[#657276] font-semibold text-left shrink-0">Service:</span>
+                <span className="font-bold text-[#032e60] text-left leading-snug">{service}.</span>
+              </div>
+              <div className="flex items-center gap-2 text-left pt-0.5">
+                <span className="text-[#657276] font-semibold text-left shrink-0">Status:</span>
+                <span className="inline-flex font-extrabold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full text-[10px] text-left">
+                  ● Enquiry Received
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* Customer ID & Application Token Card */}
-          {application?.customerId && (
-            <div className="p-4 bg-[#f0f7f4] border border-[#b2d5cb] rounded-2xl text-left">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#177d70]">
-                  Your Customer Reference ID
-                </span>
-                <button
-                  type="button"
-                  onClick={copyId}
-                  className="text-[11px] font-bold text-[#032e60] hover:text-[#177d70] flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Copy size={12} />
-                  {copied ? "Copied!" : "Copy ID"}
-                </button>
-              </div>
-              <div className="font-mono text-xl font-black text-[#032e60] tracking-wider">
-                {application.customerId}
-              </div>
+          {/* Follow-up Note */}
+          <p className="text-xs sm:text-[13px] leading-relaxed text-[#41535e] text-left">
+            Airnet Computers (Md Amjad Ali) will review your enquiry in the Admin panel and call you on{" "}
+            <strong className="text-[#032e60] font-bold">{mobileNumber || "your mobile number"}</strong> to confirm documents and complete your application.
+          </p>
 
-              <div className="mt-3 pt-3 border-t border-[#d2e7df] space-y-2 text-left text-xs">
-                <div className="flex items-baseline gap-2 text-left">
-                  <span className="text-[#657276] font-semibold text-left shrink-0">Applicant:</span>
-                  <span className="font-bold text-[#032e60] text-left">{application.customerName}</span>
-                </div>
-                <div className="flex items-baseline gap-2 text-left">
-                  <span className="text-[#657276] font-semibold text-left shrink-0">Mobile Number:</span>
-                  <span className="font-bold text-[#032e60] font-mono text-left">{application.mobileNumber}</span>
-                </div>
-                <div className="flex items-start gap-2 text-left">
-                  <span className="text-[#657276] font-semibold text-left shrink-0">Service:</span>
-                  <span className="font-bold text-[#032e60] text-left leading-snug">{application.service}</span>
-                </div>
-                <div className="flex items-center gap-2 text-left pt-0.5">
-                  <span className="text-[#657276] font-semibold text-left shrink-0">Status:</span>
-                  <span className="inline-flex font-extrabold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full text-[10px] text-left">
-                    ● Enquiry Received
-                  </span>
-                </div>
-              </div>
+          {/* Center Address, Maps & Helpline */}
+          <div className="p-3.5 bg-white border border-[#e1d7c6] rounded-xl text-xs sm:text-[12.5px] text-[#2c3e50] space-y-2 leading-relaxed">
+            <div>
+              <span className="font-semibold text-[#032e60]">📍 Center Address:</span> Opp. Congress Office, Near Omer Masjid, Haralayya Chowk, Basavakalyan – 585327
             </div>
-          )}
+            <div>
+              <span className="font-semibold text-[#032e60]">🗺️ Google Maps:</span>{" "}
+              <a
+                href="https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#177d70] hover:text-[#032e60] underline font-medium break-all"
+              >
+                https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8
+              </a>
+            </div>
+            <div>
+              <span className="font-semibold text-[#032e60]">📞 Helpline:</span>{" "}
+              <a
+                href={`tel:${displayHelpline.replace(/\s+/g, "")}`}
+                className="text-[#032e60] hover:text-[#177d70] font-bold underline"
+              >
+                {displayHelpline}
+              </a>
+            </div>
+          </div>
 
-          <p className="text-xs leading-5 text-[#5f6e74] text-left">
-            Airnet Computers (Md Amjad Ali) will review your enquiry in the Admin panel and call you on <strong className="text-[#032e60]">{application?.mobileNumber || "your mobile number"}</strong> to confirm documents and complete your application.
+          {/* Thank You Note */}
+          <p className="text-center text-xs sm:text-sm font-bold text-[#177d70] pt-1">
+            Thank you for choosing Airnet Computers!
           </p>
         </div>
 
-        {/* Sticky Footer with Close & Action Buttons */}
+        {/* Footer */}
         <div className="p-4 sm:p-5 bg-[#fcfaf5] border-t border-[#e8dfcf] flex flex-col sm:flex-row gap-2.5 shrink-0">
           {onTrack && application?.customerId && (
             <button

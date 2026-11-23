@@ -58,25 +58,56 @@ export function computeNextScheduledTime(scheduledTime: string = "23:00"): {
   };
 }
 
-// Check and trigger scheduled daily report
-export async function checkAndRunScheduledReport(): Promise<void> {
-  if (isJobRunning) return;
+export function getYesterdayISTDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toISTDateString(d);
+}
+
+// Check and trigger scheduled daily report (with force & missed catch-up support)
+export async function checkAndRunScheduledReport(
+  force = false,
+  specificDate?: string
+): Promise<{ executed: boolean; status?: string; message: string; date?: string }> {
+  if (isJobRunning && !force) {
+    return { executed: false, message: "A report generation job is already currently running." };
+  }
 
   try {
+    isJobRunning = true;
     await ensureReportTablesExist();
 
     const settingsList = await db.select().from(reportSettingsTable).where(eq(reportSettingsTable.id, "daily_report"));
     const settings = settingsList[0];
 
-    if (!settings || !settings.autoEnabled) {
-      return; // Automated reports disabled by admin
+    if (!settings || (!settings.autoEnabled && !force)) {
+      return { executed: false, message: "Automated reports are disabled in settings." };
     }
 
     const todayIST = toISTDateString();
+    const yesterdayIST = getYesterdayISTDateString();
     const currentISTTime = getISTCurrentTime24();
     const targetScheduledTime = settings.scheduledTime || "23:00";
 
-    // Trigger at or past scheduled time (e.g. >= 23:00 / 11:00 PM IST) to prevent missing the run if the server starts or ticks slightly late
+    // If specific date requested or forced (e.g. from Vercel Cron or manual API trigger)
+    if (force || specificDate) {
+      const runDate = specificDate || todayIST;
+      console.log(`[DailyReportScheduler] Manual/Cron report trigger executing for date ${runDate}...`);
+      const targetRecipient = settings.recipientEmail || "rasoolahmed246@gmail.com";
+      const sourceAdmin = settings.adminEmail || "airnetcomputersbk@gmail.com";
+      const metrics = await calculateDailyReportMetrics(runDate);
+      const result = await sendDailyReportEmail(metrics, targetRecipient, false, sourceAdmin);
+
+      lastProcessedDate = runDate;
+      return {
+        executed: true,
+        status: result.deliveryStatus,
+        date: runDate,
+        message: `Report dispatched successfully to ${targetRecipient} with status ${result.deliveryStatus}`,
+      };
+    }
+
+    // Trigger at or past scheduled time (e.g. >= 23:00 / 11:00 PM IST)
     const [targetHour, targetMin] = targetScheduledTime.split(":").map(Number);
     const [currHour, currMin] = currentISTTime.split(":").map(Number);
     const isPastOrAtSchedule =
@@ -85,10 +116,9 @@ export async function checkAndRunScheduledReport(): Promise<void> {
     if (isPastOrAtSchedule) {
       // Prevent duplicate run on the same day
       if (lastProcessedDate === todayIST || settings.lastRunDate === todayIST) {
-        return;
+        return { executed: false, message: `Report for today (${todayIST}) has already been sent.` };
       }
 
-      isJobRunning = true;
       lastProcessedDate = todayIST;
       console.log(`[DailyReportScheduler] Triggering scheduled daily report for ${todayIST} at ${currentISTTime} IST...`);
 
@@ -98,9 +128,26 @@ export async function checkAndRunScheduledReport(): Promise<void> {
       const result = await sendDailyReportEmail(metrics, targetRecipient, false, sourceAdmin);
 
       console.log(`[DailyReportScheduler] Report dispatch finished to ${targetRecipient} from ${sourceAdmin} with status: ${result.deliveryStatus}`);
+      return { executed: true, status: result.deliveryStatus, date: todayIST, message: "Scheduled report dispatched" };
     }
-  } catch (error) {
+
+    // Catch-up check: If the machine was turned off last night at 23:00, check if yesterday's report was missed
+    if (settings.lastRunDate !== yesterdayIST && settings.lastRunDate !== todayIST && currHour < targetHour) {
+      console.log(`[DailyReportScheduler] Detected missed report for yesterday (${yesterdayIST}) due to offline status. Dispatching catch-up report...`);
+      const targetRecipient = settings.recipientEmail || "rasoolahmed246@gmail.com";
+      const sourceAdmin = settings.adminEmail || "airnetcomputersbk@gmail.com";
+      const metrics = await calculateDailyReportMetrics(yesterdayIST);
+      const result = await sendDailyReportEmail(metrics, targetRecipient, false, sourceAdmin);
+
+      lastProcessedDate = yesterdayIST;
+      console.log(`[DailyReportScheduler] Catch-up report dispatch finished for ${yesterdayIST} with status: ${result.deliveryStatus}`);
+      return { executed: true, status: result.deliveryStatus, date: yesterdayIST, message: "Missed catch-up report dispatched" };
+    }
+
+    return { executed: false, message: `Waiting for scheduled time ${targetScheduledTime} IST (current time: ${currentISTTime} IST)` };
+  } catch (error: any) {
     console.error("[DailyReportScheduler] Error running scheduled report check:", error);
+    return { executed: false, message: `Scheduler error: ${error?.message || error}` };
   } finally {
     isJobRunning = false;
   }

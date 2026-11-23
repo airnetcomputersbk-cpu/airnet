@@ -420,11 +420,16 @@ export async function sendDailyReportEmail(
   const helplinePhone = await getAdminMobileNumber();
   const { subject, textBody, htmlBody } = buildEmailContent(metrics, adminEmail, recipient, helplinePhone);
 
-  // 3. Check official Gmail API (OAuth 2.0) sending first
+  // 3. Check official Gmail API (OAuth 2.0) sending if properly authorized
   const gmailCreds = await getStoredGmailCredentials();
-  const isGmailConfigured = Boolean(gmailCreds.refreshToken && gmailCreds.connectionStatus === "Connected & Authorized");
+  const isGmailConfigured = Boolean(
+    gmailCreds.refreshToken &&
+    gmailCreds.clientId &&
+    gmailCreds.clientSecret &&
+    gmailCreds.connectionStatus === "Connected & Authorized"
+  );
 
-  if (settings?.emailProvider === "gmail_api" || isGmailConfigured) {
+  if (settings?.emailProvider === "gmail_api" && isGmailConfigured) {
     console.log(`[daily-email-service] Attempting delivery via Google Gmail API to ${recipient}...`);
     const gmailResult = await sendEmailViaGmailApi({
       to: recipient,
