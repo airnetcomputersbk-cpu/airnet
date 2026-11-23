@@ -1260,7 +1260,7 @@ export default function DailyReports() {
               <div>
                 <h2 className="font-bold text-gray-900 text-base">Executive Metrics Summary</h2>
                 <p className="text-xs text-gray-500">
-                  Calculated for: <span className="font-semibold text-[#032e60]">{metrics?.reportingPeriodLabel || selectedDate}</span>
+                  Calculated for: <span className="font-semibold text-[#032e60]">{formatDateDMY(selectedDate)} (12:00 AM – 11:59 PM IST)</span>
                 </p>
               </div>
               <button

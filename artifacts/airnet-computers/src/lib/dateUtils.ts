@@ -17,8 +17,8 @@ export function formatDateDMY(val?: string | number | Date | null, fallback: str
     // Already in DD-MM-YYYY
     if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s;
 
-    // Matches pure YYYY-MM-DD or YYYY/MM/DD
-    const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    // Matches YYYY-MM-DD or YYYY/MM/DD anywhere at start (ISO timestamps, date strings, SQL datetime)
+    const ymd = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
     if (ymd) {
       const day = ymd[3].padStart(2, "0");
       const month = ymd[2].padStart(2, "0");
@@ -26,12 +26,18 @@ export function formatDateDMY(val?: string | number | Date | null, fallback: str
       return `${day}-${month}-${year}`;
     }
 
-    // Matches DD/MM/YYYY or DD.MM.YYYY
-    const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    // Matches DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+    const dmy = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
     if (dmy) {
-      const day = dmy[1].padStart(2, "0");
-      const month = dmy[2].padStart(2, "0");
+      let day = dmy[1].padStart(2, "0");
+      let month = dmy[2].padStart(2, "0");
       const year = dmy[3];
+      // If month > 12 and day <= 12, it was MM-DD-YYYY
+      if (Number(month) > 12 && Number(day) <= 12) {
+        const temp = day;
+        day = month;
+        month = temp;
+      }
       return `${day}-${month}-${year}`;
     }
   }

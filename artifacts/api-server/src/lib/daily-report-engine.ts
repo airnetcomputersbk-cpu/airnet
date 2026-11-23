@@ -1,5 +1,6 @@
 import { db, pool, enquiriesTable, applicationTasksTable, reportSettingsTable, dailyReportLogsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
+import { normalizeDateToDMY } from "./extractor";
 
 export interface StatusBreakdownItem {
   status: string;
@@ -335,7 +336,7 @@ export async function calculateDailyReportMetrics(targetReportDate?: string): Pr
         mobileNumber: t.mobileNumber,
         serviceName: t.serviceName,
         issueType: "Overdue Task",
-        details: `Stage: ${t.currentStep || status}. Target date: ${t.targetDate || "Not set"}. Priority: ${t.priority}`,
+        details: `Stage: ${t.currentStep || status}. Target date: ${normalizeDateToDMY(t.targetDate) || "Not set"}. Priority: ${t.priority}`,
         urgency: "High",
         amountPending: pending,
       });

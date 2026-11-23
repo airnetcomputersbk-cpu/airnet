@@ -28,10 +28,10 @@ export default function Records() {
   
   // High performance SWR Cache: render cached ledger records in 0ms without blank screen flicker
   const [records, setRecords] = useState<RecordEntry[]>(() => {
-    return getCachedData<RecordEntry[]>("admin_records") || [];
+    return getCachedData<RecordEntry[]>("admin_records_v3") || [];
   });
   const [loading, setLoading] = useState<boolean>(() => {
-    return !getCachedData<RecordEntry[]>("admin_records");
+    return !getCachedData<RecordEntry[]>("admin_records_v3");
   });
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -61,10 +61,11 @@ export default function Records() {
       setLoading(true);
     }
     try {
-      // Fetch details of customers from Track New Application Task as well as enquiries
-      const [trackerRes, enquiriesRes] = await Promise.all([
+      // Fetch details of customers from Track New Application Task, enquiries, and records
+      const [trackerRes, enquiriesRes, recordsRes] = await Promise.all([
         fetch("/api/admin/tracker"),
-        fetch("/api/admin/enquiries")
+        fetch("/api/admin/enquiries"),
+        fetch("/api/admin/records")
       ]);
 
       const list: RecordEntry[] = [];
@@ -99,6 +100,7 @@ export default function Records() {
         enquiries.forEach((e: any) => {
           // If this customer ID isn't already present from tracker, add it
           if (!seenCustomerIds.has(e.customerId)) {
+            if (e.customerId) seenCustomerIds.add(e.customerId);
             const charged = Number(e.amountCharged) || 0;
             const isPending = e.paymentMethod === "Pending" || e.paymentMethod === "Pending / Udhar" || e.paymentMethod === "Pending / Pay Later";
             const paid = e.amountPaid !== undefined && e.amountPaid !== null ? Number(e.amountPaid) || 0 : (isPending ? 0 : charged);
@@ -122,10 +124,38 @@ export default function Records() {
         });
       }
 
+      if (recordsRes && recordsRes.ok) {
+        const recordsData = await recordsRes.json();
+        recordsData.forEach((r: any) => {
+          const custId = r.customerId || `AN-REC-${r.id}`;
+          if (!seenCustomerIds.has(custId)) {
+            seenCustomerIds.add(custId);
+            const charged = Number(r.amountCharged) || 0;
+            const paid = Number(r.amountPaid) || 0;
+            const pending = Number(r.amountPending) || Math.max(0, charged - paid);
+            list.push({
+              id: r.id,
+              customerId: custId,
+              customerName: r.customerName || "Customer",
+              mobileNumber: r.mobileNumber || "",
+              serviceId: r.serviceProvided || "General Service",
+              amountPaid: paid,
+              amountPending: pending,
+              amountCharged: charged || (paid + pending),
+              paymentMethod: r.paymentMethod || "Cash",
+              applicationStatus: "Completed",
+              notes: r.notes || "",
+              createdAt: r.createdAt,
+              source: "enquiry"
+            });
+          }
+        });
+      }
+
       // Sort by newest created first
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setRecords(list);
-      setCachedData("admin_records", list);
+      setCachedData("admin_records_v3", list);
     } catch (err) {
       console.error("Failed to load records:", err);
     } finally {
@@ -269,7 +299,7 @@ export default function Records() {
         }
         setRecords(current => {
           const updated = current.filter(r => !(r.id === rec.id && r.source === rec.source));
-          setCachedData("admin_records", updated);
+          setCachedData("admin_records_v3", updated);
           return updated;
         });
       }
@@ -297,7 +327,7 @@ export default function Records() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatDateDMY(new Date());
     link.setAttribute("href", url);
     link.setAttribute("download", `Airnet-Ledger-${today}.csv`);
     document.body.appendChild(link);
@@ -508,7 +538,7 @@ export default function Records() {
                         {rec.customerId || "AN-MIGRATED"}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-600 text-sm whitespace-nowrap font-medium">
+                    <td className="p-4 text-gray-700 text-sm whitespace-nowrap font-semibold font-mono">
                       {formatDateDMY(rec.createdAt)}
                     </td>
                     <td className="p-4">

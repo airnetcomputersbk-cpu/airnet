@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { formatDateDMY } from "../lib/dateUtils";
+import { formatDateDMY, formatDateTimeDMY } from "../lib/dateUtils";
 import {
   Route,
   Minus,
@@ -1572,7 +1572,7 @@ export default function PathwayWindow() {
                             {step.completedAt && (
                               <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-mono">
                                 <Calendar className="w-3 h-3" />
-                                <span>Completed: {new Date(step.completedAt).toLocaleString("en-IN")}</span>
+                                <span>Completed: {formatDateTimeDMY(step.completedAt)}</span>
                               </div>
                             )}
                           </div>

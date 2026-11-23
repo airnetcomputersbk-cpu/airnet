@@ -55425,7 +55425,7 @@ async function calculateDailyReportMetrics(targetReportDate) {
         mobileNumber: t.mobileNumber,
         serviceName: t.serviceName,
         issueType: "Overdue Task",
-        details: `Stage: ${t.currentStep || status}. Target date: ${t.targetDate || "Not set"}. Priority: ${t.priority}`,
+        details: `Stage: ${t.currentStep || status}. Target date: ${normalizeDateToDMY(t.targetDate) || "Not set"}. Priority: ${t.priority}`,
         urgency: "High",
         amountPending: pending
       });
@@ -55563,6 +55563,7 @@ var init_daily_report_engine = __esm({
   "src/lib/daily-report-engine.ts"() {
     "use strict";
     init_src();
+    init_extractor();
     tablesInitialized = false;
   }
 });

@@ -64,18 +64,10 @@ function toLocalMonthString(d: Date | string | number): string {
   return `${year}-${month}`;
 }
 
-// Format date into human-readable format e.g., "Thursday, 29 October 2026"
+// Format date into standard DD-MM-YYYY format
 function formatDateDisplay(dateStr: string): string {
   if (!dateStr) return "";
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  if (isNaN(date.getTime())) return dateStr;
-  return date.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  });
+  return formatDateDMY(dateStr);
 }
 
 // Format month into human-readable format e.g., "October 2026"
@@ -548,7 +540,7 @@ export default function Reports() {
               Today's Income
             </span>
             <span className="text-[10px] bg-emerald-200/60 text-emerald-900 font-mono font-bold px-1.5 py-0.5 rounded">
-              {todayStr}
+              {formatDateDMY(todayStr)}
             </span>
           </div>
           <div className="flex items-baseline gap-1">

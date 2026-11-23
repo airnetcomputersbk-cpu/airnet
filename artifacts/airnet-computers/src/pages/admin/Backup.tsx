@@ -262,7 +262,7 @@ export default function Backup() {
         `"${(r.notes || "").replace(/"/g, '""').replace(/\n/g, ' ')}"`
       ]);
 
-      downloadCSV(headers, rows, `Airnet-Customer-Ledger-${new Date().toISOString().split("T")[0]}.csv`);
+      downloadCSV(headers, rows, `Airnet-Customer-Ledger-${formatDateDMY(new Date())}.csv`);
     } else {
       // Direct module export from records
       const headers = ["SL No", "Customer ID", "Date", "Customer Name", "Mobile", "Service", "Paid Amount", "Pending Balance", "Status"];
@@ -278,7 +278,7 @@ export default function Backup() {
         r.applicationStatus
       ]);
 
-      downloadCSV(headers, rows, `Airnet-${selectedModule}-export-${new Date().toISOString().split("T")[0]}.csv`);
+      downloadCSV(headers, rows, `Airnet-${selectedModule}-export-${formatDateDMY(new Date())}.csv`);
     }
   };
 
