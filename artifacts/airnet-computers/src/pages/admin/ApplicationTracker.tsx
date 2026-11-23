@@ -32,6 +32,11 @@ import { useModal } from "../../context/ModalContext";
 import { getCachedData, setCachedData } from "../../lib/dataCache";
 import { useLiveSync } from "../../hooks/useLiveSync";
 import { usePathway } from "../../context/PathwayContext";
+import {
+  getAcceptedWhatsAppMessage,
+  getRejectedWhatsAppMessage,
+  getOnHoldWhatsAppMessage,
+} from "../../lib/whatsapp-templates";
 
 export type ApplicationStep = {
   id: string;
@@ -415,10 +420,9 @@ export default function ApplicationTracker() {
       setActiveTrackingTask(updatedTask);
     }
 
-    // When status becomes Completed, send message to user via WhatsApp & display completion dialog
+    // When status becomes Completed, display completion dialog (Admin clicks to send WhatsApp)
     const becameCompleted = (status === "Completed" && task.status !== "Completed") || (progressPercent === 100 && task.progressPercent < 100);
     if (becameCompleted) {
-      sendWhatsAppUpdate(updatedTask);
       setCompletedNotificationTask(updatedTask);
     }
 
@@ -529,7 +533,6 @@ export default function ApplicationTracker() {
         );
 
         if (becameCompleted) {
-          sendWhatsAppUpdate(saved);
           setCompletedNotificationTask(saved);
         }
       } else {
@@ -548,6 +551,24 @@ export default function ApplicationTracker() {
   };
 
   const getRawWhatsAppMessage = (task: ApplicationTask) => {
+    if (task.status === "On Hold") {
+      return getOnHoldWhatsAppMessage({
+        customerId: task.customerId,
+        customerName: task.customerName,
+        mobileNumber: task.mobileNumber,
+        serviceName: task.serviceName,
+      });
+    }
+
+    if (task.status === "Rejected") {
+      return getRejectedWhatsAppMessage({
+        customerId: task.customerId,
+        customerName: task.customerName,
+        mobileNumber: task.mobileNumber,
+        serviceName: task.serviceName,
+      });
+    }
+
     const isCompleted = task.status === "Completed" || task.progressPercent === 100;
     const paymentInfo = (task.amountPending && task.amountPending > 0)
       ? `💰 *Payment:* Paid: ₹${task.amountPaid ?? 0} | Balance Due: ₹${task.amountPending}\n⚠️ *Pending Amount to Pay:* ₹${task.amountPending}\n`
@@ -567,7 +588,7 @@ ${paymentInfo}
 🎉 *Document Ready for Collection!*
 Please visit our office to collect your document.
 📍 *Location:* Airnet Computers, Haralayya Chowk, Basavakalyan
-🗺️ *Google Maps:* https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8
+🗺️ *Google Maps:* https://maps.app.goo.gl/boUHFrmjBcsLkwms9
 📞 *Helpline:* ${helplinePhone}
 
 Thank you for choosing Airnet Computers!`;

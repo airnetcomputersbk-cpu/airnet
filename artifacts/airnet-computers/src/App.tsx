@@ -1561,22 +1561,6 @@ function SuccessModal({
 }) {
   const [copied, setCopied] = useState(false);
 
-  // Notify backend notification system about new enquiry without opening external apps
-  useEffect(() => {
-    if (application?.customerId && application?.mobileNumber) {
-      fetch("/api/enquiries/send-confirmation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: application.customerId,
-          customerName: application.customerName,
-          mobileNumber: application.mobileNumber,
-          serviceName: application.service,
-        }),
-      }).catch(console.error);
-    }
-  }, [application?.customerId, application?.mobileNumber, application?.customerName, application?.service]);
-
   const copyId = () => {
     if (application?.customerId) {
       navigator.clipboard.writeText(application.customerId);
@@ -1607,7 +1591,7 @@ function SuccessModal({
             </div>
             <div className="text-left flex-1 min-w-0">
               <h2 className="font-display text-lg sm:text-2xl font-bold tracking-tight text-[#032e60] text-left">
-                Application Received!
+                Application Submitted Successfully
               </h2>
               <p className="mt-0.5 text-xs text-[#52616b] text-left">
                 Your application enquiry has been saved and dispatched to Airnet Computers.
@@ -1631,7 +1615,7 @@ function SuccessModal({
           <div className="p-4 bg-[#f0f7f4] border border-[#b2d5cb] rounded-2xl text-left">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#177d70]">
-                Your Customer Reference ID
+                Customer ID
               </span>
               <button
                 type="button"
@@ -1648,7 +1632,7 @@ function SuccessModal({
 
             <div className="mt-3 pt-3 border-t border-[#d2e7df] space-y-2 text-left text-xs sm:text-[13px]">
               <div className="flex items-baseline gap-2 text-left">
-                <span className="text-[#657276] font-semibold text-left shrink-0">Applicant:</span>
+                <span className="text-[#657276] font-semibold text-left shrink-0">Applicant Name:</span>
                 <span className="font-bold text-[#032e60] text-left">{customerName}</span>
               </div>
               <div className="flex items-baseline gap-2 text-left">
@@ -1656,8 +1640,8 @@ function SuccessModal({
                 <span className="font-bold text-[#032e60] font-mono text-left">{mobileNumber}</span>
               </div>
               <div className="flex items-start gap-2 text-left">
-                <span className="text-[#657276] font-semibold text-left shrink-0">Service:</span>
-                <span className="font-bold text-[#032e60] text-left leading-snug">{service}.</span>
+                <span className="text-[#657276] font-semibold text-left shrink-0">Service Name:</span>
+                <span className="font-bold text-[#032e60] text-left leading-snug">{service}</span>
               </div>
               <div className="flex items-center gap-2 text-left pt-0.5">
                 <span className="text-[#657276] font-semibold text-left shrink-0">Status:</span>
@@ -1682,12 +1666,12 @@ function SuccessModal({
             <div>
               <span className="font-semibold text-[#032e60]">🗺️ Google Maps:</span>{" "}
               <a
-                href="https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8"
+                href="https://maps.app.goo.gl/boUHFrmjBcsLkwms9"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#177d70] hover:text-[#032e60] underline font-medium break-all"
               >
-                https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8
+                https://maps.app.goo.gl/boUHFrmjBcsLkwms9
               </a>
             </div>
             <div>
@@ -1729,56 +1713,6 @@ function SuccessModal({
   );
 }
 
-function getTrackerProgressMessage(task: any, helpline: string = "+91 7892881086"): string {
-  const isCompleted = task.status === "Completed" || task.progressPercent === 100;
-  
-  const paymentInfo = (task.amountPending && task.amountPending > 0)
-    ? `💰 *Payment Details:* Paid: ₹${task.amountPaid ?? 0} | Balance Due: ₹${task.amountPending}\n⚠️ *Due to Pay:* ₹${task.amountPending}\n`
-    : (task.amountPaid && task.amountPaid > 0)
-    ? `💰 *Payment Details:* Paid in Full (₹${task.amountPaid})\n`
-    : "";
-
-  const completedSteps = (task.steps || [])
-    .filter((s: any) => s.status === "completed")
-    .map((s: any) => `✓ ${s.title}`)
-    .join("\n");
-
-  const milestonesSection = completedSteps
-    ? `\n📋 *Completed Milestones:*\n${completedSteps}\n`
-    : "";
-
-  if (isCompleted) {
-    return `*AIRNET COMPUTERS - Application Status Update*
-━━━━━━━━━━━━━━━━━━━━━━━━
-👤 *Customer ID:* ${task.customerId}
-📋 *Customer Name:* ${task.customerName}
-🛠️ *Service:* ${task.serviceName}
-${task.applicationNumber ? `🔖 *Ref/Ack No:* ${task.applicationNumber}\n` : ""}📍 *Current Stage:* ${task.currentStep}
-📊 *Progress:* 100% [Completed]
-${paymentInfo}${milestonesSection}
-🎉 *Document Ready for Collection!*
-Please visit our office to collect your document.
-📍 *Location:* Airnet Computers, Haralayya Chowk, Basavakalyan
-🗺️ *Google Maps:* https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8
-📞 *Helpline:* ${helpline}
-
-Thank you for choosing Airnet Computers!`;
-  }
-
-  return `*AIRNET COMPUTERS - Application Status Update*
-━━━━━━━━━━━━━━━━━━━━━━━━
-👤 *Customer ID:* ${task.customerId}
-📋 *Customer Name:* ${task.customerName}
-🛠️ *Service:* ${task.serviceName}
-${task.applicationNumber ? `🔖 *Ref/Ack No:* ${task.applicationNumber}\n` : ""}📍 *Current Stage:* ${task.currentStep}
-📊 *Progress:* ${task.progressPercent}% [${task.status}]
-${task.targetDate ? `📅 *Est. Ready Date:* ${task.targetDate}\n` : ""}${paymentInfo}${milestonesSection}
-ℹ️ Your application is currently being processed by our team.
-For any queries, reply to this message or call ${helpline}.
-
-Thank you for choosing Airnet Computers!`;
-}
-
 function CustomerTrackerModal({
   initialQuery = "",
   helpline = "+91 7892881086",
@@ -1792,41 +1726,16 @@ function CustomerTrackerModal({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [searched, setSearched] = useState(false);
-  const [noticeSent, setNoticeSent] = useState(false);
-  const [copiedTaskId, setCopiedTaskId] = useState<number | string | null>(null);
-  const [showMsgPreview, setShowMsgPreview] = useState<number | string | null>(null);
-  const [customMobile, setCustomMobile] = useState<Record<string | number, string>>({});
 
   const executeLookup = async (q: string) => {
     if (!q.trim()) return;
     setLoading(true);
     setSearched(true);
-    setNoticeSent(false);
     try {
       const res = await fetch(`/api/tracker/lookup?q=${encodeURIComponent(q.trim())}`);
       if (res.ok) {
         const data = await res.json();
         setResults(data);
-
-        // Automatically dispatch progress message notification for found customer application
-        if (Array.isArray(data) && data.length > 0) {
-          const firstTask = data[0];
-          const progressMsg = getTrackerProgressMessage(firstTask);
-
-          fetch("/api/tracker/send-progress", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              customerId: firstTask.customerId,
-              mobileNumber: firstTask.mobileNumber,
-              customerName: firstTask.customerName,
-              serviceName: firstTask.serviceName,
-              message: progressMsg
-            })
-          }).catch(console.error);
-
-          setNoticeSent(true);
-        }
       } else {
         setResults([]);
       }
@@ -1852,7 +1761,7 @@ function CustomerTrackerModal({
   return (
     <ModalFrame title="Track Your Application" eyebrow="Live Status & Milestones" onClose={onClose}>
       <p className="mt-4 text-sm leading-6 text-[#657276]">
-        Enter your <strong>Customer ID</strong> (e.g. <code>AN-12345</code>), <strong>Application / Ack Number</strong>, or 10-digit mobile number to see real-time progress and receive your status message.
+        Enter your <strong>Customer ID</strong> (e.g. <code>AN-12345</code>), <strong>Application / Ack Number</strong>, or 10-digit mobile number to see real-time progress.
       </p>
 
       <form onSubmit={handleSearch} className="mt-5 flex gap-2">
@@ -1874,24 +1783,6 @@ function CustomerTrackerModal({
         </button>
       </form>
 
-      {/* Live Dispatched Status Message Banner */}
-      {searched && noticeSent && results && results.length > 0 && (
-        <div className="mt-4 p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs text-emerald-950 shadow-2xs animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-            <div>
-              <span className="font-bold text-emerald-900 block">Application Progress Message Generated & Dispatched!</span>
-              <span className="text-[11px] text-emerald-800">
-                Live status and milestone details ready for <strong>+91 {results[0].mobileNumber}</strong> ({results[0].customerName})
-              </span>
-            </div>
-          </div>
-          <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-            ✓ Dispatched
-          </span>
-        </div>
-      )}
-
       {searched && results !== null && (
         <div className="mt-5 space-y-4 max-h-[55vh] overflow-y-auto pr-1.5 custom-scrollbar">
           {results.length === 0 ? (
@@ -1901,9 +1792,6 @@ function CustomerTrackerModal({
             </div>
           ) : (
             results.map((task) => {
-              const cleanPhone = (task.mobileNumber || "").replace(/\D/g, "");
-              const rawMessage = getTrackerProgressMessage(task, helpline);
-
               return (
                 <div key={task.id} className="p-4 rounded-xl border border-[#d6cbb9] bg-white shadow-sm space-y-3.5">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -1974,7 +1862,7 @@ function CustomerTrackerModal({
                       </div>
                       <p className="text-gray-700">Please collect your Document from our office.</p>
                       <a
-                        href="https://maps.app.goo.gl/B6R9Jy9GfA1VdMoB8"
+                        href="https://maps.app.goo.gl/boUHFrmjBcsLkwms9"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-semibold underline mt-1"
@@ -1983,111 +1871,6 @@ function CustomerTrackerModal({
                       </a>
                     </div>
                   )}
-
-                  {/* ============================================================== */}
-                  {/* MESSAGE OF APPLICATION PROGRESS SECTION (USER REQUEST) */}
-                  {/* ============================================================== */}
-                  <div className="p-3 bg-gradient-to-r from-emerald-50/90 to-teal-50/90 rounded-xl border border-emerald-200 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#032e60] flex items-center gap-1.5">
-                        <Send size={13} className="text-emerald-700" />
-                        Application Progress Message
-                      </span>
-                      <span className="text-[10px] bg-white border border-emerald-300 text-emerald-800 font-mono font-bold px-2 py-0.5 rounded">
-                        To: +91 {task.mobileNumber || "Customer"}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* WhatsApp Button */}
-                      {cleanPhone && (
-                        <a
-                          href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(rawMessage)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all"
-                          title="Open WhatsApp with pre-filled status update message"
-                        >
-                          <MessageCircle size={14} />
-                          Send on WhatsApp
-                        </a>
-                      )}
-
-                      {/* SMS Button */}
-                      {cleanPhone && (
-                        <a
-                          href={`sms:${cleanPhone}?body=${encodeURIComponent(rawMessage)}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#032e60] hover:bg-[#0b477e] text-white font-bold text-xs rounded-lg shadow-sm transition-all"
-                          title="Send SMS"
-                        >
-                          <Send size={13} />
-                          Send SMS
-                        </a>
-                      )}
-
-                      {/* Copy Message Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(rawMessage);
-                          setCopiedTaskId(task.id);
-                          setTimeout(() => setCopiedTaskId(null), 2500);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-lg shadow-2xs transition-all"
-                      >
-                        {copiedTaskId === task.id ? (
-                          <>
-                            <Check size={13} className="text-emerald-600" />
-                            <span className="text-emerald-700 font-bold">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            Copy Message
-                          </>
-                        )}
-                      </button>
-
-                      {/* Toggle Message Preview Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowMsgPreview(prev => prev === task.id ? null : task.id)}
-                        className="text-[11px] font-bold text-blue-700 hover:underline ml-auto"
-                      >
-                        {showMsgPreview === task.id ? "Hide Message ▲" : "View Message ▼"}
-                      </button>
-                    </div>
-
-                    {/* Forward to Another Mobile Number */}
-                    <div className="flex items-center gap-2 pt-1 border-t border-emerald-200/60 text-xs">
-                      <input
-                        type="tel"
-                        placeholder="Forward to another mobile number..."
-                        value={customMobile[task.id] || ""}
-                        onChange={(e) => setCustomMobile({ ...customMobile, [task.id]: e.target.value })}
-                        className="h-7 px-2.5 rounded-lg border border-gray-300 text-xs font-mono bg-white flex-1 focus:ring-1 focus:ring-[#177d70] outline-none"
-                      />
-                      <a
-                        href={`https://wa.me/91${(customMobile[task.id] || "").replace(/\D/g, "")}?text=${encodeURIComponent(rawMessage)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                          (customMobile[task.id] || "").replace(/\D/g, "").length >= 10
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-gray-200 text-gray-400 pointer-events-none"
-                        }`}
-                      >
-                        <Send size={11} /> Forward
-                      </a>
-                    </div>
-
-                    {/* Expandable Preview with Visible Custom Scrollbar */}
-                    {showMsgPreview === task.id && (
-                      <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-xs text-gray-800 font-mono whitespace-pre-wrap leading-relaxed shadow-inner max-h-48 overflow-y-auto custom-scrollbar-emerald">
-                        {rawMessage}
-                      </div>
-                    )}
-                  </div>
 
                   <div className="pt-2 border-t border-gray-100 space-y-2">
                     <div className="text-xs font-bold text-gray-700">Milestones & Steps:</div>

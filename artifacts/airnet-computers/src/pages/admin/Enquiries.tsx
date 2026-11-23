@@ -1,10 +1,12 @@
 import { useState, useEffect, useDeferredValue } from "react";
 import { useLocation } from "wouter";
-import { Check, Clock, XCircle, Search, Eye, Pencil, Trash2, X, BookPlus, IndianRupee, User, Filter, Share2, ArrowRight, Route } from "lucide-react";
+import { Check, Clock, XCircle, Search, Eye, Pencil, Trash2, X, BookPlus, IndianRupee, User, Filter, Share2, ArrowRight, Route, MessageCircle } from "lucide-react";
 import { useModal } from "../../context/ModalContext";
 import { getCachedData, setCachedData } from "../../lib/dataCache";
 import { useLiveSync } from "../../hooks/useLiveSync";
 import { usePathway } from "../../context/PathwayContext";
+import { AdminWhatsAppModal } from "../../components/AdminWhatsAppModal";
+import { NotificationApplication } from "../../lib/whatsapp-templates";
 
 type Enquiry = {
   id: number;
@@ -51,6 +53,17 @@ export default function Enquiries() {
   const [recordAmountPaid, setRecordAmountPaid] = useState("");
   const [recordPaymentMethod, setRecordPaymentMethod] = useState("Cash");
   const [recordNotes, setRecordNotes] = useState("");
+
+  // Admin WhatsApp Modal state
+  const [whatsAppModal, setWhatsAppModal] = useState<{
+    isOpen: boolean;
+    status: "Accepted" | "Rejected" | "On Hold" | null;
+    application: NotificationApplication | null;
+  }>({
+    isOpen: false,
+    status: null,
+    application: null,
+  });
 
   const fetchEnquiries = async (silent = false) => {
     if (!silent && enquiries.length === 0) {
@@ -120,41 +133,36 @@ export default function Enquiries() {
   const handleStatusChange = async (enq: Enquiry, newStatus: string) => {
     if (newStatus === enq.applicationStatus) return;
 
-    // 1. Rejected: Prompt confirmation message. If confirmed, delete customer data permanently.
+    // 1. Rejected: Update status to Rejected and open Admin WhatsApp Notification modal
     if (newStatus === "Rejected") {
-      const confirmed = await confirm({
-        title: "Reject & Delete Application?",
-        message: `Are you sure you want to REJECT the application for "${enq.customerName}"?\n\nThis will permanently delete the customer's enquiry data. This action may not be reversible.`,
-        confirmText: "YES – Delete",
-        cancelText: "NO – Cancel",
-        isDanger: true,
-      });
-      if (!confirmed) {
-        // User cancelled, revert to current status
-        setEnquiries(current => [...current]);
-        return;
-      }
-
-      // Optimistic delete
-      setEnquiries(current => current.filter(e => e.id !== enq.id));
+      setEnquiries(current => current.map(e => e.id === enq.id ? { ...e, applicationStatus: "Rejected" } : e));
       try {
         const res = await fetch(`/api/admin/enquiries/${enq.id}`, {
-          method: "DELETE"
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicationStatus: "Rejected" })
         });
-        if (!res.ok) throw new Error("Failed to delete enquiry");
-        showSuccess(
-          "Application Rejected & Deleted",
-          `Customer application for "${enq.customerName}" was rejected and the data has been permanently removed.`
-        );
+        if (!res.ok) throw new Error("Failed to reject enquiry");
+
+        setWhatsAppModal({
+          isOpen: true,
+          status: "Rejected",
+          application: {
+            customerId: enq.customerId || `AN-${enq.id}`,
+            customerName: enq.customerName,
+            mobileNumber: enq.mobileNumber,
+            serviceName: getServiceLabel(enq),
+          }
+        });
       } catch (err: any) {
         console.error(err);
-        showError("Rejection Failed", err.message || "Failed to delete rejected enquiry.");
+        showError("Rejection Failed", err.message || "Failed to update status to Rejected.");
         fetchEnquiries(); // revert on failure
       }
       return;
     }
 
-    // 2. Accepted: Update status to Accepted, automatically move customer application to Application Tracker and delete from My Enquiry List
+    // 2. Accepted: Update status to Accepted, automatically move customer application to Application Tracker and open Admin WhatsApp Notification modal
     if (newStatus === "Accepted") {
       // Optimistically remove from My Enquiry List
       setEnquiries(current => {
@@ -174,21 +182,20 @@ export default function Enquiries() {
         
         await fetchEnquiries(); // Refresh enquiries list with latest data from server
 
-        const trackingId = data.trackingId || enq.customerId || "Generated";
+        const trackingId = data.trackingId || enq.customerId || `AN-${enq.id}`;
         const serviceLabel = data.serviceTitle || getServiceLabel(enq);
-        const resolvedApplyUrl = data.applyUrl || getServiceApplyUrl(serviceLabel);
 
-        const openTracker = await confirm({
-          title: "Application Accepted",
-          message: `Application for "${enq.customerName}" has been successfully Accepted and moved to the Application Tracker!\n\n📋 Tracking ID: ${trackingId}\n🛠️ Service: ${serviceLabel}\n🔗 Official Portal: ${resolvedApplyUrl}\n\n✅ This enquiry has been automatically deleted from My Enquiry List.\n\nWould you like to open the Application Tracker now to manage its steps?`,
-          confirmText: "Go to Application Tracker",
-          cancelText: "Stay on Enquiry List",
-          isDanger: false,
+        // Open Admin WhatsApp Modal for Accepted application
+        setWhatsAppModal({
+          isOpen: true,
+          status: "Accepted",
+          application: {
+            customerId: trackingId,
+            customerName: enq.customerName,
+            mobileNumber: enq.mobileNumber,
+            serviceName: serviceLabel,
+          }
         });
-
-        if (openTracker) {
-          setLocation("/admin/tracker");
-        }
       } catch (err: any) {
         console.error(err);
         showError("Status Update Failed", err.message || "Failed to accept enquiry.");
@@ -197,7 +204,7 @@ export default function Enquiries() {
       return;
     }
 
-    // 3. On Hold: Update status to On Hold and keep in My Enquiry List
+    // 3. On Hold: Update status to On Hold and open Admin WhatsApp Notification modal
     if (newStatus === "On Hold") {
       setEnquiries(current => current.map(e => e.id === enq.id ? { ...e, applicationStatus: "On Hold" } : e));
       try {
@@ -207,10 +214,18 @@ export default function Enquiries() {
           body: JSON.stringify({ applicationStatus: "On Hold" })
         });
         if (!res.ok) throw new Error("Failed to update status to On Hold");
-        showInfo(
-          "Status Updated",
-          `Application for "${enq.customerName}" is kept On Hold in My Enquiry List.`
-        );
+
+        // Open Admin WhatsApp Modal for On Hold application
+        setWhatsAppModal({
+          isOpen: true,
+          status: "On Hold",
+          application: {
+            customerId: enq.customerId || `AN-${enq.id}`,
+            customerName: enq.customerName,
+            mobileNumber: enq.mobileNumber,
+            serviceName: getServiceLabel(enq),
+          }
+        });
       } catch (err: any) {
         console.error(err);
         showError("Status Update Failed", err.message || "Failed to put enquiry On Hold.");
@@ -615,6 +630,28 @@ export default function Enquiries() {
                         <Route size={18}/>
                       </button>
                       <button onClick={() => openRecordModal(enq)} className="text-emerald-600 hover:text-emerald-800 p-2" title="Add to Ledger"><BookPlus size={18}/></button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mappedStatus: "Accepted" | "Rejected" | "On Hold" = 
+                            enq.applicationStatus === "Rejected" ? "Rejected" :
+                            enq.applicationStatus === "On Hold" ? "On Hold" : "Accepted";
+                          setWhatsAppModal({
+                            isOpen: true,
+                            status: mappedStatus,
+                            application: {
+                              customerId: enq.customerId || `AN-${enq.id}`,
+                              customerName: enq.customerName,
+                              mobileNumber: enq.mobileNumber,
+                              serviceName: getServiceLabel(enq),
+                            }
+                          });
+                        }}
+                        className="text-emerald-600 hover:text-emerald-800 p-2 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        title="Send WhatsApp Notification"
+                      >
+                        <MessageCircle size={18} />
+                      </button>
                       <button onClick={() => setViewingEnquiry(enq)} className="text-gray-500 hover:text-gray-700 p-2" title="View Details"><Eye size={18}/></button>
                       <button onClick={() => setEditingEnquiry(enq)} className="text-blue-600 hover:text-blue-800 p-2" title="Edit"><Pencil size={18}/></button>
                       <button onClick={() => handleDelete(enq)} className="text-red-600 hover:text-red-800 p-2 cursor-pointer" title="Delete"><Trash2 size={18}/></button>
@@ -1023,6 +1060,18 @@ export default function Enquiries() {
           </div>
         </div>
       )}
+
+      {/* Admin WhatsApp Notification Modal */}
+      <AdminWhatsAppModal
+        isOpen={whatsAppModal.isOpen}
+        status={whatsAppModal.status}
+        application={whatsAppModal.application}
+        onClose={() => setWhatsAppModal({ isOpen: false, status: null, application: null })}
+        onTrackerNavigate={() => {
+          setWhatsAppModal({ isOpen: false, status: null, application: null });
+          setLocation("/admin/tracker");
+        }}
+      />
     </div>
   );
 }
