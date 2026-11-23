@@ -4,6 +4,7 @@ import { useModal } from "../../context/ModalContext";
 import { getCachedData, setCachedData } from "../../lib/dataCache";
 import { useLiveSync } from "../../hooks/useLiveSync";
 import { usePathway } from "../../context/PathwayContext";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 type RecordEntry = {
   id: number;
@@ -280,7 +281,7 @@ export default function Records() {
     const rows = filteredRecords.map((r, i) => [
       filteredRecords.length - i,
       r.customerId || "AN-MIGRATED",
-      new Date(r.createdAt).toLocaleDateString(),
+      formatDateDMY(r.createdAt),
       `"${r.customerName}"`,
       r.mobileNumber,
       `"${r.serviceId || 'General'}"`,
@@ -507,8 +508,8 @@ export default function Records() {
                         {rec.customerId || "AN-MIGRATED"}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-600 text-sm whitespace-nowrap">
-                      {new Date(rec.createdAt).toLocaleDateString()}
+                    <td className="p-4 text-gray-600 text-sm whitespace-nowrap font-medium">
+                      {formatDateDMY(rec.createdAt)}
                     </td>
                     <td className="p-4">
                       <div className="font-bold text-[#032e60] text-sm">{rec.customerName}</div>
@@ -872,7 +873,7 @@ export default function Records() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 font-semibold uppercase">Date Logged</p>
-                  <p className="font-medium text-gray-800 mt-0.5">{new Date(viewingRecord.createdAt).toLocaleString()}</p>
+                  <p className="font-medium text-gray-800 mt-0.5">{formatDateTimeDMY(viewingRecord.createdAt)}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

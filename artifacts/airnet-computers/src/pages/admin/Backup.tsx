@@ -26,6 +26,7 @@ import {
   Info
 } from "lucide-react";
 import { useModal } from "../../context/ModalContext";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 type RecordEntry = {
   id: number;
@@ -250,7 +251,7 @@ export default function Backup() {
       const rows = filteredRecords.map((r, i) => [
         filteredRecords.length - i,
         r.customerId || "AN-MIGRATED",
-        new Date(r.createdAt).toLocaleDateString(),
+        formatDateDMY(r.createdAt),
         `"${r.customerName}"`,
         r.mobileNumber,
         `"${r.serviceId || 'General'}"`,
@@ -268,7 +269,7 @@ export default function Backup() {
       const rows = records.map((r, i) => [
         records.length - i,
         r.customerId,
-        new Date(r.createdAt).toLocaleDateString(),
+        formatDateDMY(r.createdAt),
         `"${r.customerName}"`,
         r.mobileNumber,
         `"${r.serviceId}"`,
@@ -847,7 +848,7 @@ export default function Backup() {
                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900">
                       <span className="font-bold block">✓ Valid Airnet Backup Snapshot Verified</span>
                       <span className="text-[11px] text-emerald-800">
-                        Exported on {new Date(restorePayload.metadata?.exportedAt).toLocaleDateString()} by {restorePayload.metadata?.owner}
+                        Exported on {formatDateDMY(restorePayload.metadata?.exportedAt)} by {restorePayload.metadata?.owner}
                       </span>
                     </div>
 

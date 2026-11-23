@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useDeferredValue } from "react";
 import { useLiveSync } from "../../hooks/useLiveSync";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 import {
   IndianRupee,
   TrendingUp,
@@ -453,7 +454,7 @@ export default function Reports() {
     const rows = tableTransactions.map(t => [
       `"${t.id}"`,
       `"${t.customerId}"`,
-      `"${t.dateStr}"`,
+      `"${formatDateDMY(t.dateStr)}"`,
       `"${t.customerName.replace(/"/g, '""')}"`,
       `"${t.mobileNumber}"`,
       `"${t.serviceName.replace(/"/g, '""')}"`,
@@ -965,7 +966,7 @@ export default function Reports() {
                   {periodData.dayWiseList.map((day) => (
                     <tr key={day.dateStr} className="hover:bg-gray-50 transition-colors">
                       <td className="p-2.5 font-semibold text-gray-900 whitespace-nowrap">
-                        {formatDateDisplay(day.dateStr)}
+                        {formatDateDMY(day.dateStr)}
                       </td>
                       <td className="p-2.5 font-medium text-gray-600">{day.count} {day.count === 1 ? 'order' : 'orders'}</td>
                       <td className="p-2.5 font-bold font-mono text-emerald-800">₹{day.income.toLocaleString("en-IN")}</td>
@@ -1075,8 +1076,8 @@ export default function Reports() {
                 tableTransactions.map((t) => (
                   <tr key={t.id} className="hover:bg-gray-50/80 transition-colors">
                     <td className="p-3.5 whitespace-nowrap text-gray-600">
-                      <div className="font-semibold text-gray-900">{t.dateStr}</div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="font-semibold text-gray-900">{formatDateDMY(t.dateStr)}</div>
+                      <div className="text-[11px] text-gray-400 font-medium">
                         {new Date(t.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </td>

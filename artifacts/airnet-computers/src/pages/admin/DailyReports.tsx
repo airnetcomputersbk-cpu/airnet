@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 interface ReportSettings {
   id: string;
@@ -1221,7 +1222,7 @@ export default function DailyReports() {
             </div>
             <div className="flex justify-between items-center">
               <span>Last Reported Date:</span>
-              <span className="font-semibold text-gray-900">{settings?.lastRunDate || "Today"}</span>
+              <span className="font-semibold text-gray-900">{settings?.lastRunDate ? formatDateDMY(settings.lastRunDate) : "Today"}</span>
             </div>
             <div className="flex justify-between items-center">
               <span>Next Run (IST):</span>
@@ -1512,7 +1513,7 @@ export default function DailyReports() {
               <tbody className="divide-y divide-gray-100 text-gray-700">
                 {historyLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 font-bold text-gray-900">{log.reportDate}</td>
+                    <td className="py-3 px-4 font-bold text-gray-900">{formatDateDMY(log.reportDate)}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
                         log.emailProvider === "gmail_api"
@@ -1522,8 +1523,8 @@ export default function DailyReports() {
                         {log.emailProvider === "gmail_api" ? "Gmail API" : "SMTP"}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-xs text-gray-500">
-                      {new Date(log.generatedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+                    <td className="py-3 px-4 text-xs text-gray-500 font-medium">
+                      {formatDateTimeDMY(log.generatedAt)}
                     </td>
                     <td className="py-3 px-4 text-xs font-mono text-gray-600">{log.recipient}</td>
                     <td className="py-3 px-4">

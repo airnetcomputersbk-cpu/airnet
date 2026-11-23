@@ -19,6 +19,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { usePathway, PathwayCustomer } from "../../context/PathwayContext";
+import { formatDateTimeDMY } from "../../lib/dateUtils";
 
 export function PathwayPopoutView({ onRestore }: { onRestore?: () => void }) {
   const {
@@ -428,7 +429,7 @@ export function PathwayPopoutView({ onRestore }: { onRestore?: () => void }) {
                       type="button"
                       onClick={() => {
                         const now = new Date();
-                        const timeStamp = `[${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} ${now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}] `;
+                        const timeStamp = `[${formatDateTimeDMY(now)}] `;
                         handleNoteChange(currentNoteText ? `${currentNoteText} ${timeStamp}` : timeStamp);
                       }}
                       className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded border border-slate-200 cursor-pointer"

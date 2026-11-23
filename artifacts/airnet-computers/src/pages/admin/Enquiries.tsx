@@ -7,6 +7,7 @@ import { useLiveSync } from "../../hooks/useLiveSync";
 import { usePathway } from "../../context/PathwayContext";
 import { AdminWhatsAppModal } from "../../components/AdminWhatsAppModal";
 import { NotificationApplication } from "../../lib/whatsapp-templates";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 type Enquiry = {
   id: number;
@@ -538,8 +539,8 @@ export default function Enquiries() {
 
                 return (
                   <tr key={enq.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-4 text-gray-600 whitespace-nowrap text-xs">
-                      {new Date(enq.createdAt).toLocaleDateString()}
+                    <td className="p-4 text-gray-600 whitespace-nowrap text-xs font-medium">
+                      {formatDateDMY(enq.createdAt)}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">
@@ -878,7 +879,7 @@ export default function Enquiries() {
               </div>
               <div><p className="text-sm text-gray-500">Customer Name</p><p className="font-medium">{viewingEnquiry.customerName}</p></div>
               <div><p className="text-sm text-gray-500">Mobile Number</p><p className="font-medium">{viewingEnquiry.mobileNumber}</p></div>
-              <div><p className="text-sm text-gray-500">Date Submitted</p><p className="font-medium">{new Date(viewingEnquiry.createdAt).toLocaleString()}</p></div>
+              <div><p className="text-sm text-gray-500">Date Submitted</p><p className="font-medium">{formatDateTimeDMY(viewingEnquiry.createdAt)}</p></div>
               <div><p className="text-sm text-gray-500">Notes / References</p><p className="font-medium whitespace-pre-wrap">{viewingEnquiry.notes || "No notes provided."}</p></div>
               <div><p className="text-sm text-gray-500">Status</p><p className="font-medium font-bold text-[#032e60]">{viewingEnquiry.applicationStatus}</p></div>
               
@@ -936,7 +937,7 @@ export default function Enquiries() {
                                 )}
                               </div>
                               <span className="text-[10px] text-gray-500 font-mono">
-                                {new Date(q.createdAt).toLocaleDateString()} · {q.customerId || `AN-${q.id}`}
+                                {formatDateDMY(q.createdAt)} · {q.customerId || `AN-${q.id}`}
                               </span>
                             </div>
                             <div className="text-right">

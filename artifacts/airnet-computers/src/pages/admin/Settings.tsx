@@ -20,6 +20,7 @@ import {
   Globe,
   ShieldAlert,
 } from "lucide-react";
+import { formatDateTimeDMY } from "../../lib/dateUtils";
 
 interface AdminSettingsData {
   adminEmail: string;
@@ -392,7 +393,7 @@ export default function AdminSettings() {
                   </span>
                   <div className="flex items-center gap-2 text-xs text-gray-600">
                     <Clock className="w-3.5 h-3.5 text-gray-400" />
-                    <span>{new Date(data.passwordUpdatedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</span>
+                    <span>{formatDateTimeDMY(data.passwordUpdatedAt)} IST</span>
                   </div>
                 </div>
               )}

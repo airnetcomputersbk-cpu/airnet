@@ -33,6 +33,7 @@ import {
 import { useModal } from "../../context/ModalContext";
 import { useLiveSync } from "../../hooks/useLiveSync";
 import { getCachedData, setCachedData } from "../../lib/dataCache";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 export interface CustomerDocumentItem {
   id: number;
@@ -680,7 +681,7 @@ export default function Documents() {
       `"${c.serviceName.replace(/"/g, '""')}"`,
       `"${c.acknowledgementNumber || '-'}"`,
       c.totalDocuments,
-      c.lastUploadDate ? new Date(c.lastUploadDate).toLocaleDateString("en-IN") : "-",
+      formatDateDMY(c.lastUploadDate),
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
@@ -1388,7 +1389,7 @@ export default function Documents() {
                               <span>•</span>
                               <span>{formatFileSize(doc.fileSize)}</span>
                               <span>•</span>
-                              <span>{new Date(doc.uploadedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                              <span>{formatDateTimeDMY(doc.uploadedAt)}</span>
                             </div>
                           </div>
                         </div>

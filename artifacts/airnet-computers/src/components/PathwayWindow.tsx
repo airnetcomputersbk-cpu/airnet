@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { formatDateDMY } from "../lib/dateUtils";
 import {
   Route,
   Minus,
@@ -162,12 +163,7 @@ export default function PathwayWindow() {
     return () => clearInterval(timer);
   }, []);
 
-  const formattedDate = currentDateTime.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
+  const formattedDate = `${currentDateTime.toLocaleDateString("en-IN", { weekday: "short" })}, ${formatDateDMY(currentDateTime)}`;
 
   const formattedTime = currentDateTime.toLocaleTimeString("en-IN", {
     hour: "2-digit",

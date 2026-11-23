@@ -84,8 +84,14 @@ export function getTodayDMY(): string {
   return `${day}-${month}-${year}`;
 }
 
-export function formatDateDMY(val?: string | null): string {
+export function formatDateDMY(val?: string | Date | null): string {
   if (!val) return "Open / As per notice";
+  if (val instanceof Date) {
+    const day = String(val.getDate()).padStart(2, "0");
+    const month = String(val.getMonth() + 1).padStart(2, "0");
+    const year = val.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
   const s = String(val).trim();
   if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s;
 
@@ -280,12 +286,7 @@ export default function NotificationsAdmin() {
     return () => clearInterval(timer);
   }, []);
 
-  const liveDateStr = currentDateTime.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  });
+  const liveDateStr = `${currentDateTime.toLocaleDateString("en-IN", { weekday: "short" })}, ${formatDateDMY(currentDateTime)}`;
 
   const liveTimeStr = currentDateTime.toLocaleTimeString("en-IN", {
     hour: "2-digit",

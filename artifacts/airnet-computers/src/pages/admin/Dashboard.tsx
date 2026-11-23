@@ -975,8 +975,8 @@ export default function Dashboard() {
                         }`}>
                           {enq.applicationStatus || "New"}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          {timeAgo(enq.createdAt)}
+                        <span className="text-[10px] text-gray-400 font-medium font-mono">
+                          {formatDateDMY(enq.createdAt)} · {timeAgo(enq.createdAt)}
                         </span>
                       </div>
                     </div>

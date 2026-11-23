@@ -37,6 +37,7 @@ import {
   getRejectedWhatsAppMessage,
   getOnHoldWhatsAppMessage,
 } from "../../lib/whatsapp-templates";
+import { formatDateDMY, formatDateTimeDMY } from "../../lib/dateUtils";
 
 export type ApplicationStep = {
   id: string;
@@ -601,7 +602,7 @@ Dear Customer,
 🛠️ *Service:* ${task.serviceName}
 ${task.applicationNumber ? `🔖 *Ref/Ack No:* ${task.applicationNumber}\n` : ""}📍 *Current Step:* ${task.currentStep}
 📊 *Progress:* ${task.progressPercent}% [${task.status}]
-${task.targetDate ? `📅 *Est. Ready Date:* ${task.targetDate}\n` : ""}${paymentInfo}ℹ️ Your application is currently being processed.
+${task.targetDate ? `📅 *Est. Ready Date:* ${formatDateDMY(task.targetDate)}\n` : ""}${paymentInfo}ℹ️ Your application is currently being processed.
 For any queries, reply to this message or call ${helplinePhone}.
 
 Thank you for choosing Airnet Computers!`;
@@ -949,7 +950,7 @@ Thank you for choosing Airnet Computers!`;
                     <span className="text-xs text-gray-400 uppercase font-semibold block">Target Deadline</span>
                     <span className="text-gray-700 flex items-center gap-1">
                       <Calendar size={13} className="text-gray-400" />
-                      {task.targetDate || "Open Timeline"}
+                      {formatDateDMY(task.targetDate, "Open Timeline")}
                     </span>
                   </div>
 
@@ -1231,7 +1232,7 @@ Thank you for choosing Airnet Computers!`;
                         {step.completedAt && (
                           <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                             <Clock size={11} />
-                            Completed on: {new Date(step.completedAt).toLocaleString()}
+                            Completed on: {formatDateTimeDMY(step.completedAt)}
                           </div>
                         )}
 
