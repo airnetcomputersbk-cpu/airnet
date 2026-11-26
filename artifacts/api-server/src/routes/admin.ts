@@ -1160,20 +1160,34 @@ adminRouter.post("/records", async (req, res) => {
 
 adminRouter.patch("/records/:id", async (req, res) => {
   try {
-    const updateData: Record<string, any> = { ...req.body };
-    if (updateData.amountCharged !== undefined) updateData.amountCharged = Number(updateData.amountCharged) || 0;
-    if (updateData.amountPaid !== undefined) updateData.amountPaid = Number(updateData.amountPaid) || 0;
-    if (updateData.amountPending !== undefined) updateData.amountPending = Number(updateData.amountPending) || 0;
+    const recId = Number(req.params.id);
+    const body = req.body || {};
+    const updateData: Record<string, any> = {};
+
+    if (body.customerName !== undefined) updateData.customerName = String(body.customerName);
+    if (body.mobileNumber !== undefined) updateData.mobileNumber = body.mobileNumber ? String(body.mobileNumber) : null;
+    if (body.serviceProvided !== undefined) updateData.serviceProvided = String(body.serviceProvided);
+    else if (body.serviceName !== undefined) updateData.serviceProvided = String(body.serviceName);
+    else if (body.serviceId !== undefined) updateData.serviceProvided = String(body.serviceId);
+
+    if (body.paymentMethod !== undefined) updateData.paymentMethod = String(body.paymentMethod);
+    else if (body.paymentType !== undefined) updateData.paymentMethod = String(body.paymentType);
+
+    if (body.amountCharged !== undefined) updateData.amountCharged = Number(body.amountCharged) || 0;
+    if (body.amountPaid !== undefined) updateData.amountPaid = Number(body.amountPaid) || 0;
+    if (body.amountPending !== undefined) updateData.amountPending = Number(body.amountPending) || 0;
+    if (body.notes !== undefined) updateData.notes = String(body.notes);
 
     const [updatedRecord] = await db.update(recordsTable)
       .set(updateData)
-      .where(eq(recordsTable.id, Number(req.params.id)))
+      .where(eq(recordsTable.id, recId))
       .returning();
       
     invalidateCache("admin:records", "pathway:customers", "documents:customers*");
     broadcastEvent("records", "update", updatedRecord);
     res.json(updatedRecord);
   } catch (error) {
+    console.error("Error updating record:", error);
     res.status(500).json({ error: "Failed to update record" });
   }
 });

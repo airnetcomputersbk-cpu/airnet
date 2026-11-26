@@ -60260,15 +60260,26 @@ ${finalNotes}`;
     });
     adminRouter.patch("/records/:id", async (req2, res) => {
       try {
-        const updateData = { ...req2.body };
-        if (updateData.amountCharged !== void 0) updateData.amountCharged = Number(updateData.amountCharged) || 0;
-        if (updateData.amountPaid !== void 0) updateData.amountPaid = Number(updateData.amountPaid) || 0;
-        if (updateData.amountPending !== void 0) updateData.amountPending = Number(updateData.amountPending) || 0;
-        const [updatedRecord] = await db.update(recordsTable).set(updateData).where(eq(recordsTable.id, Number(req2.params.id))).returning();
+        const recId = Number(req2.params.id);
+        const body = req2.body || {};
+        const updateData = {};
+        if (body.customerName !== void 0) updateData.customerName = String(body.customerName);
+        if (body.mobileNumber !== void 0) updateData.mobileNumber = body.mobileNumber ? String(body.mobileNumber) : null;
+        if (body.serviceProvided !== void 0) updateData.serviceProvided = String(body.serviceProvided);
+        else if (body.serviceName !== void 0) updateData.serviceProvided = String(body.serviceName);
+        else if (body.serviceId !== void 0) updateData.serviceProvided = String(body.serviceId);
+        if (body.paymentMethod !== void 0) updateData.paymentMethod = String(body.paymentMethod);
+        else if (body.paymentType !== void 0) updateData.paymentMethod = String(body.paymentType);
+        if (body.amountCharged !== void 0) updateData.amountCharged = Number(body.amountCharged) || 0;
+        if (body.amountPaid !== void 0) updateData.amountPaid = Number(body.amountPaid) || 0;
+        if (body.amountPending !== void 0) updateData.amountPending = Number(body.amountPending) || 0;
+        if (body.notes !== void 0) updateData.notes = String(body.notes);
+        const [updatedRecord] = await db.update(recordsTable).set(updateData).where(eq(recordsTable.id, recId)).returning();
         invalidateCache("admin:records", "pathway:customers", "documents:customers*");
         broadcastEvent("records", "update", updatedRecord);
         res.json(updatedRecord);
       } catch (error40) {
+        console.error("Error updating record:", error40);
         res.status(500).json({ error: "Failed to update record" });
       }
     });

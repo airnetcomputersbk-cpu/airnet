@@ -19,7 +19,7 @@ type RecordEntry = {
   applicationStatus: string;
   notes: string;
   createdAt: string;
-  source: "tracker" | "enquiry";
+  source: "tracker" | "enquiry" | "record";
 };
 
 export default function Records() {
@@ -146,7 +146,7 @@ export default function Records() {
               applicationStatus: "Completed",
               notes: r.notes || "",
               createdAt: r.createdAt,
-              source: "enquiry"
+              source: "record"
             });
           }
         });
@@ -249,11 +249,43 @@ export default function Records() {
           })
         });
         if (res.ok) {
-          setRecords(current => current.map(r => r.id === editingRecord.id && r.source === "tracker" ? { ...editingRecord, amountCharged: charged, amountPaid: paid, amountPending: pending } : r));
+          setRecords(current => {
+            const updated = current.map(r => r.id === editingRecord.id && r.source === "tracker" ? { ...editingRecord, amountCharged: charged, amountPaid: paid, amountPending: pending } : r);
+            setCachedData("admin_records_v3", updated);
+            return updated;
+          });
           setEditingRecord(null);
           showSuccess("Record Updated", `Customer ledger entry for "${editingRecord.customerName}" updated successfully.`);
+          fetchRecords(true);
         } else {
           showError("Update Failed", "Failed to update record in application tracker.");
+        }
+      } else if (editingRecord.source === "record") {
+        const res = await fetch(`/api/admin/records/${editingRecord.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerName: editingRecord.customerName,
+            mobileNumber: editingRecord.mobileNumber,
+            serviceProvided: editingRecord.serviceId,
+            paymentMethod: editingRecord.paymentMethod,
+            amountCharged: charged,
+            amountPaid: paid,
+            amountPending: pending,
+            notes: editingRecord.notes
+          })
+        });
+        if (res.ok) {
+          setRecords(current => {
+            const updated = current.map(r => r.id === editingRecord.id && r.source === "record" ? { ...editingRecord, amountCharged: charged, amountPaid: paid, amountPending: pending } : r);
+            setCachedData("admin_records_v3", updated);
+            return updated;
+          });
+          setEditingRecord(null);
+          showSuccess("Record Updated", `Customer ledger entry for "${editingRecord.customerName}" updated successfully.`);
+          fetchRecords(true);
+        } else {
+          showError("Update Failed", "Failed to update record in database records.");
         }
       } else {
         const res = await fetch(`/api/admin/enquiries/${editingRecord.id}`, {
@@ -270,9 +302,14 @@ export default function Records() {
           })
         });
         if (res.ok) {
-          setRecords(current => current.map(r => r.id === editingRecord.id && r.source === "enquiry" ? { ...editingRecord, amountCharged: charged, amountPaid: paid, amountPending: pending } : r));
+          setRecords(current => {
+            const updated = current.map(r => r.id === editingRecord.id && r.source === "enquiry" ? { ...editingRecord, amountCharged: charged, amountPaid: paid, amountPending: pending } : r);
+            setCachedData("admin_records_v3", updated);
+            return updated;
+          });
           setEditingRecord(null);
           showSuccess("Record Updated", `Customer ledger entry for "${editingRecord.customerName}" updated successfully.`);
+          fetchRecords(true);
         } else {
           showError("Update Failed", "Failed to update record in enquiry ledger.");
         }
@@ -292,6 +329,8 @@ export default function Records() {
       onConfirm: async () => {
         const res = rec.source === "tracker"
           ? await fetch(`/api/admin/tracker/${rec.id}`, { method: "DELETE" })
+          : rec.source === "record"
+          ? await fetch(`/api/admin/records/${rec.id}`, { method: "DELETE" })
           : await fetch(`/api/admin/enquiries/${rec.id}`, { method: "DELETE" });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -302,6 +341,7 @@ export default function Records() {
           setCachedData("admin_records_v3", updated);
           return updated;
         });
+        fetchRecords(true);
       }
     });
   };
@@ -356,10 +396,22 @@ export default function Records() {
     return matchesSearch && matchesPendingStatus && matchesPayment;
   });
 
+  const isFiltered = Boolean(deferredSearch.trim() || filterPendingStatus !== "All" || filterPayment !== "All");
+
   const totalCharged = records.reduce((sum, r) => sum + (Number(r.amountCharged) || ((Number(r.amountPaid) || 0) + (Number(r.amountPending) || 0))), 0);
   const totalPaid = records.reduce((sum, r) => sum + (Number(r.amountPaid) || 0), 0);
   const totalPending = records.reduce((sum, r) => sum + (Number(r.amountPending) || 0), 0);
   const pendingCount = records.filter(r => (Number(r.amountPending) || 0) > 0).length;
+
+  const filteredCharged = filteredRecords.reduce((sum, r) => sum + (Number(r.amountCharged) || ((Number(r.amountPaid) || 0) + (Number(r.amountPending) || 0))), 0);
+  const filteredPaid = filteredRecords.reduce((sum, r) => sum + (Number(r.amountPaid) || 0), 0);
+  const filteredPending = filteredRecords.reduce((sum, r) => sum + (Number(r.amountPending) || 0), 0);
+  const filteredPendingCount = filteredRecords.filter(r => (Number(r.amountPending) || 0) > 0).length;
+
+  const displayCharged = isFiltered ? filteredCharged : totalCharged;
+  const displayPaid = isFiltered ? filteredPaid : totalPaid;
+  const displayPending = isFiltered ? filteredPending : totalPending;
+  const displayPendingCount = isFiltered ? filteredPendingCount : pendingCount;
 
   return (
     <div className="space-y-6">
@@ -417,8 +469,10 @@ export default function Records() {
         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-blue-700">Total Amount Charged</div>
-            <div className="text-2xl font-bold text-blue-700 mt-1">₹{totalCharged.toLocaleString('en-IN')}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">Total billed to customers</div>
+            <div className="text-2xl font-bold text-blue-700 mt-1">₹{displayCharged.toLocaleString('en-IN')}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">
+              {isFiltered ? `Matching filter (₹${totalCharged.toLocaleString('en-IN')} all records)` : "Total billed to customers"}
+            </div>
           </div>
           <div className="h-11 w-11 rounded-xl bg-blue-50 text-blue-700 grid place-items-center">
             <IndianRupee size={22} />
@@ -428,8 +482,10 @@ export default function Records() {
         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total Paid Amount</div>
-            <div className="text-2xl font-bold text-emerald-600 mt-1">₹{totalPaid.toLocaleString('en-IN')}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">Total collected across records</div>
+            <div className="text-2xl font-bold text-emerald-600 mt-1">₹{displayPaid.toLocaleString('en-IN')}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">
+              {isFiltered ? `Matching filter (₹${totalPaid.toLocaleString('en-IN')} all records)` : "Total collected across records"}
+            </div>
           </div>
           <div className="h-11 w-11 rounded-xl bg-emerald-50 text-emerald-600 grid place-items-center">
             <IndianRupee size={22} />
@@ -439,8 +495,12 @@ export default function Records() {
         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-amber-700">Total Due Amount</div>
-            <div className="text-2xl font-bold text-amber-600 mt-1">₹{totalPending.toLocaleString('en-IN')}</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">{pendingCount} customer{pendingCount === 1 ? "" : "s"} with dues</div>
+            <div className="text-2xl font-bold text-amber-600 mt-1">₹{displayPending.toLocaleString('en-IN')}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">
+              {isFiltered 
+                ? `${displayPendingCount} matching (${pendingCount} overall with dues)` 
+                : `${pendingCount} customer${pendingCount === 1 ? "" : "s"} with dues`}
+            </div>
           </div>
           <div className="h-11 w-11 rounded-xl bg-amber-50 text-amber-600 grid place-items-center">
             <AlertCircle size={22} />
